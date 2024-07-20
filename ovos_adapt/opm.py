@@ -17,7 +17,7 @@ from functools import lru_cache
 from threading import Lock
 from typing import List, Tuple, Optional
 
-from adapt.engine import IntentDeterminationEngine
+from ovos_adapt.engine import IntentDeterminationEngine
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import IntentContextManager as ContextManager, \
     SessionManager
