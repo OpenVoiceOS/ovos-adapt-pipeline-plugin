@@ -13,9 +13,9 @@
 # limitations under the License.
 #
 
-from adapt.context import ContextManager
-from adapt.engine import IntentDeterminationEngine
-from adapt.intent import IntentBuilder
+from ovos_adapt.context import ContextManager
+from ovos_adapt.engine import IntentDeterminationEngine
+from ovos_adapt.intent import IntentBuilder
 
 __author__ = "seanfitz"
 

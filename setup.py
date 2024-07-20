@@ -31,17 +31,16 @@ def required(requirements_file):
                 if pkg.strip() and not pkg.startswith("#")]
 
 setup(
-    name="adapt-parser",
+    name="ovos-adapt-parser",
     version="1.0.0",
     author="Sean Fitzgerald",
-    author_email="sean@fitzgeralds.me",
     description=("A text-to-intent parsing framework."),
     long_description=long_description,
     long_description_content_type="text/markdown",
     license=("Apache License 2.0"),
     keywords="natural language processing",
-    url="https://github.com/MycroftAI/adapt",
-    packages=["adapt", "adapt.tools", "adapt.tools.text", "adapt.tools.debug"],
+    url="https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin",
+    packages=["ovos_adapt", "ovos_adapt.tools", "ovos_adapt.tools.text", "ovos_adapt.tools.debug"],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',

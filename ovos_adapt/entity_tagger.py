@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 
-from adapt.tools.text.trie import Trie
+from ovos_adapt.tools.text.trie import Trie
 from six.moves import xrange
 
 __author__ = 'seanfitz'
@@ -32,7 +32,7 @@ class EntityTagger(object):
 
     def _iterate_subsequences(self, tokens):
         """
-        Using regex invokes this function, which significantly impacts performance of adapt. it is an N! operation.
+        Using regex invokes this function, which significantly impacts performance of ovos_adapt. it is an N! operation.
 
         Args:
             tokens(list): list of tokens for Yield results.

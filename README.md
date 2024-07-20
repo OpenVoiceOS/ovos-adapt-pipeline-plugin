@@ -1,24 +1,10 @@
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.md) [![CLA](https://img.shields.io/badge/CLA%3F-Required-blue.svg)](https://mycroft.ai/cla) [![Team](https://img.shields.io/badge/Team-Mycroft_Core-violetblue.svg)](https://github.com/MycroftAI/contributors/blob/master/team/Mycroft%20Core.md) ![Status](https://img.shields.io/badge/-Production_ready-green.svg)
-
-[![Build Status](https://travis-ci.org/MycroftAI/adapt.svg?branch=master)](https://travis-ci.org/MycroftAI/adapt) [![Coverage Status](https://coveralls.io/repos/github/MycroftAI/adapt/badge.svg?branch=dev)](https://coveralls.io/github/MycroftAI/adapt?branch=master)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
-[![Join chat](https://img.shields.io/badge/Mattermost-join_chat-brightgreen.svg)](https://chat.mycroft.ai)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.md) 
 
 Adapt Intent Parser
 ==================
 The Adapt Intent Parser is a flexible and extensible intent definition and determination framework. It is intended to parse natural language text into a structured intent that can then be invoked programatically.
 
-[![Introducing the Adapt Intent Parser](https://mycroft.ai/wp-content/uploads/2019/05/Adapt-video-still.png)](https://www.youtube.com/watch?v=zR9xvPtM6Ro)
-
-Getting Started
-===============
-To take a dependency on Adapt, it's recommended to use virtualenv and pip to install source from github.
-
-```bash
-$ virtualenv myvirtualenv
-$ . myvirtualenv/bin/activate
-$ pip install -e git+https://github.com/mycroftai/adapt#egg=adapt-parser
-```
+This repository contains a OVOS pipeline plugin and bundles a fork of the original [adapt-parser](https://github.com/MycroftAI/adapt) from the defunct MycroftAI
 
 Examples
 ========
@@ -87,26 +73,6 @@ def register_pandora_vocab(emitter):
             register_vocab('Pandora Station', match)
 ```
 
-Development
-===========
-
-Glad you'd like to help!
-
-To install test and development requirements run
-
-```
-pip install -r test-requirements.txt
-```
-
-This will install the test-requirements as well as the runtime requirements for adapt.
-
-To test any changes before submitting them run
-
-```
-./run_tests.sh
-```
-
-This will run the same checks as the Github actions and verify that your code should pass with flying colours.
 
 Reporting Issues
 ================
@@ -115,15 +81,13 @@ please include a serialized copy of the intent determination engine using the de
 utilities.
 
 ```python
-from adapt.engine import IntentDeterminationEngine
+from ovos_adapt.engine import IntentDeterminationEngine
+
 engine = IntentDeterminationEngine()
 # Load engine with vocabulary and parsers
 
-import adapt.tools.debug as atd
-atd.dump(engine, 'debug.adapt')
+import ovos_adapt.tools.debug as atd
+
+atd.dump(engine, 'debug.ovos_adapt')
 ```
 
-Learn More
-========
-
-Further documentation can be found at https://mycroft-ai.gitbook.io/docs/mycroft-technologies/adapt

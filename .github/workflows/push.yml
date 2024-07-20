@@ -82,7 +82,7 @@ jobs:
         elif [[ $VERSION == *"-"* ]]; then
           echo "Pre-release suffix detected. Not pushing to mycroft-core."
         else
-          sed -E "s/adapt-parser==[0-9]+\.[0-9]+\.[0-9]+/adapt-parser==$VERSION/" requirements/requirements.txt > tmp-requirements.txt
+          sed -E "s/ovos-adapt-parser==[0-9]+\.[0-9]+\.[0-9]+/ovos-adapt-parser==$VERSION/" requirements/requirements.txt > tmp-requirements.txt
           mv tmp-requirements.txt requirements/requirements.txt
           echo "ADAPT_VERSION=$VERSION" >> $GITHUB_ENV
         fi
@@ -92,9 +92,9 @@ jobs:
       uses: peter-evans/create-pull-request@v3
       with:
         token: ${{ secrets.BOT_TOKEN }}
-        push-to-fork: mycroft-adapt-bot/mycroft-core
+        push-to-fork: mycroft-ovos_adapt-bot/mycroft-core
         commit-message: Update Adapt to v${{ env.ADAPT_VERSION }}
-        branch: feature/update-adapt
+        branch: feature/update-ovos_adapt
         delete-branch: true
         title: Update Adapt to v${{ env.ADAPT_VERSION }}
-        body: Automated update from mycroftai/adapt.
+        body: Automated update from mycroftai/ovos_adapt.

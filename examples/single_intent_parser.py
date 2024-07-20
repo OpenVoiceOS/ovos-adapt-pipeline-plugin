@@ -7,8 +7,8 @@ PYTHONPATH=. python examples/single_intent_parser.py "what's the weather like in
 """
 import json
 import sys
-from adapt.intent import IntentBuilder
-from adapt.engine import IntentDeterminationEngine
+from ovos_adapt.intent import IntentBuilder
+from ovos_adapt.engine import IntentDeterminationEngine
 
 engine = IntentDeterminationEngine()
 

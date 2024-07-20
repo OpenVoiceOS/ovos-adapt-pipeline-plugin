@@ -15,11 +15,11 @@
 
 import re
 import unittest
-from adapt.parser import Parser
-from adapt.entity_tagger import EntityTagger
-from adapt.intent import IntentBuilder, resolve_one_of, choose_1_from_each
-from adapt.tools.text.tokenizer import EnglishTokenizer
-from adapt.tools.text.trie import Trie
+from ovos_adapt.parser import Parser
+from ovos_adapt.entity_tagger import EntityTagger
+from ovos_adapt.intent import IntentBuilder, resolve_one_of, choose_1_from_each
+from ovos_adapt.tools.text.tokenizer import EnglishTokenizer
+from ovos_adapt.tools.text.trie import Trie
 
 __author__ = 'seanfitz'
 

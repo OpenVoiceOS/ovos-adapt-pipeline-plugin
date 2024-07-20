@@ -1,6 +1,6 @@
 import pickle
 
-from adapt.engine import DomainIntentDeterminationEngine, \
+from ovos_adapt.engine import DomainIntentDeterminationEngine, \
     IntentDeterminationEngine
 
 """
@@ -12,7 +12,7 @@ some things we can leverage to make things safer.
 First, we expect the deserialized object to be an instance of 
 IntentDeterminationEngine or DomainIntentDeterminationEngine as a basic
 sanity check. We also leverage a custom `pickle.Unpickler` implementation
-that only allows specific imports from the adapt namespace, and displays
+that only allows specific imports from the ovos_adapt namespace, and displays
 a helpful error message if this assumption is validated.
 
 This is a bit of security theater; folks investigating issues have to know to 
@@ -27,12 +27,12 @@ EXPECTED_ENGINES = set([
 ])
 
 SAFE_CLASSES = [
-    ("adapt.engine", "IntentDeterminationEngine"),
-    ("adapt.engine", "DomainIntentDeterminationEngine"),
-    ("adapt.tools.text.tokenizer", "EnglishTokenizer"),
-    ("adapt.tools.text.trie", "Trie"),
-    ("adapt.tools.text.trie", "TrieNode"),
-    ("adapt.intent", "Intent")
+    ("ovos_adapt.engine", "IntentDeterminationEngine"),
+    ("ovos_adapt.engine", "DomainIntentDeterminationEngine"),
+    ("ovos_adapt.tools.text.tokenizer", "EnglishTokenizer"),
+    ("ovos_adapt.tools.text.trie", "Trie"),
+    ("ovos_adapt.tools.text.trie", "TrieNode"),
+    ("ovos_adapt.intent", "Intent")
 ]
 
 
@@ -62,7 +62,7 @@ def load(filename):
 
 def dump(engine, filename):
     """
-    Serialize an adapt Intent engine and write it to the target file.
+    Serialize an ovos_adapt Intent engine and write it to the target file.
     :param engine (IntentDeterminationEngine or DomainIntentDeterminationEngine):
     :param filename (str): destination path
     """

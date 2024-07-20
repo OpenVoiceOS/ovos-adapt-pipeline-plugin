@@ -15,7 +15,7 @@
 
 import unittest
 
-from adapt.context import ContextManager, ContextManagerFrame
+from ovos_adapt.context import ContextManager, ContextManagerFrame
 
 
 class ContextManagerFrameTest(unittest.TestCase):
