@@ -1,2 +1,2 @@
 six>=1.10.0
-ovos-plugin-manager>=0.0.26a32
+ovos-plugin-manager>=0.0.26a33
