@@ -16,6 +16,7 @@
 __author__ = 'seanfitz'
 
 import os
+
 from setuptools import setup
 
 with open("README.md", "r") as fh:
@@ -30,6 +31,9 @@ def required(requirements_file):
         return [pkg for pkg in requirements
                 if pkg.strip() and not pkg.startswith("#")]
 
+
+PLUGIN_ENTRY_POINT = 'ovos-adapt-pipeline-plugin=ovos_adapt.opm:AdaptPipeline'
+
 setup(
     name="ovos-adapt-parser",
     version="1.0.0",
@@ -39,8 +43,12 @@ setup(
     long_description_content_type="text/markdown",
     license=("Apache License 2.0"),
     keywords="natural language processing",
+    entry_points={'opm.pipeline': PLUGIN_ENTRY_POINT},
     url="https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin",
-    packages=["ovos_adapt", "ovos_adapt.tools", "ovos_adapt.tools.text", "ovos_adapt.tools.debug"],
+    packages=["ovos_adapt",
+              "ovos_adapt.tools",
+              "ovos_adapt.tools.text",
+              "ovos_adapt.tools.debug"],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
@@ -54,6 +62,5 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
     ],
-
     install_requires=required('requirements.txt')
 )
