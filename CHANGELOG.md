@@ -1,21 +1,12 @@
 # Changelog
 
-## [0.1.0a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/0.1.0a2) (2024-10-14)
+## [0.1.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/0.1.1a1) (2024-10-14)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/de984a17dae7080ecce0c3eb3e101b44fdf062ba...0.1.0a2)
-
-**Implemented enhancements:**
-
-- feat/OPM Pipeline [\#2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/2) ([JarbasAl](https://github.com/JarbasAl))
-- Add "excludes" to Intent [\#1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/1) ([JarbasAl](https://github.com/JarbasAl))
-
-**Closed issues:**
-
-- needs automations [\#3](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/issues/3)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/0.1.0...0.1.1a1)
 
 **Merged pull requests:**
 
-- semver [\#4](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/4) ([JarbasAl](https://github.com/JarbasAl))
+- refactor:upstream classes [\#6](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/6) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
