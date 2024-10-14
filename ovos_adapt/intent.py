@@ -15,7 +15,8 @@
 
 __author__ = 'seanfitz'
 
-from ovos_workshop.intent import Intent, IntentBuilder
+import itertools
+from ovos_workshop.intents import Intent, IntentBuilder
 
 
 def is_entity(tag, entity_name):
@@ -67,7 +68,8 @@ def choose_1_from_each(lists):
     Returns:
         a generator of lists, see docs on :func:`~itertools.product`
     """
-    return Intent._choose_1_from_each(lists)
+    for result in itertools.product(*lists):
+        yield list(result)
 
 
 def resolve_one_of(tags, at_least_one):
