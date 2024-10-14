@@ -15,7 +15,9 @@
 
 __author__ = 'seanfitz'
 
+import abc
 import itertools
+from typing import Optional, List
 
 CLIENT_ENTITY_NAME = 'Client'
 
@@ -116,8 +118,20 @@ def resolve_one_of(tags, at_least_one):
     return None
 
 
-class Intent(object):
-    def __init__(self, name, requires, at_least_one, optional, excludes=None):
+class _IntentMeta(abc.ABCMeta):
+    def __instancecheck__(self, instance):
+        try:
+            # backwards compat isinstancechecks
+            from adapt.intent import Intent as _I
+            return isinstance(instance, _I) or \
+                super().__instancecheck__(instance)
+        except ImportError:
+            return super().__instancecheck__(instance)
+
+
+class Intent(metaclass=_IntentMeta):
+    def __init__(self, name: str, requires: Optional[List[str]], at_least_one: Optional[List[str]] = None,
+                 optional: Optional[List[str]] = None, excludes: Optional[List[str]] = None):
         """Create Intent object
 
         Args:
@@ -127,10 +141,11 @@ class Intent(object):
             optional(list): Optional Entities used by the intent
         """
         self.name = name
-        self.requires = requires
-        self.at_least_one = at_least_one
-        self.optional = optional
+        self.requires = requires or []
+        self.at_least_one = at_least_one or []
+        self.optional = optional or []
         self.excludes = excludes or []
+        assert self.requires or self.at_least_one
 
     def validate(self, tags, confidence):
         """Using this method removes tags from the result of validate_with_tags
@@ -191,9 +206,7 @@ class Intent(object):
                 for key in best_resolution:
                     # TODO: at least one should support aliases
                     result[key] = best_resolution[key][0].get('key')
-                    intent_confidence += \
-                        1.0 * best_resolution[key][0]['entities'][0]\
-                        .get('confidence', 1.0)
+                    intent_confidence += 1.0 * best_resolution[key][0]['entities'][0].get('confidence', 1.0)
                 used_tags.append(best_resolution[key][0])
                 if best_resolution in local_tags:
                     local_tags.remove(best_resolution[key][0])
@@ -221,7 +234,18 @@ class Intent(object):
         return result, used_tags
 
 
-class IntentBuilder(object):
+class _IntentBuilderMeta(abc.ABCMeta):
+    def __instancecheck__(self, instance):
+        try:
+            # backwards compat isinstancechecks
+            from adapt.intent import IntentBuilder as _IB
+            return isinstance(instance, _IB) or \
+                super().__instancecheck__(instance)
+        except ImportError:
+            return super().__instancecheck__(instance)
+
+
+class IntentBuilder(metaclass=_IntentBuilderMeta):
     """
     IntentBuilder, used to construct intent parsers.
 
@@ -242,6 +266,7 @@ class IntentBuilder(object):
             .one_of("C","D")\
             .optional("G").build()
     """
+
     def __init__(self, intent_name):
         """
         Constructor
