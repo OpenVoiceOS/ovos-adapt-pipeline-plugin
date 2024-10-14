@@ -14,11 +14,11 @@
 #
 
 import unittest
-from adapt.engine import DomainIntentDeterminationEngine
-from adapt.intent import IntentBuilder
-from adapt.entity_tagger import EntityTagger
-from adapt.tools.text.tokenizer import EnglishTokenizer
-from adapt.tools.text.trie import Trie
+from ovos_adapt.engine import DomainIntentDeterminationEngine
+from ovos_adapt.intent import IntentBuilder
+from ovos_adapt.entity_tagger import EntityTagger
+from ovos_adapt.tools.text.tokenizer import EnglishTokenizer
+from ovos_adapt.tools.text.trie import Trie
 
 __author__ = 'seanfitz'
 

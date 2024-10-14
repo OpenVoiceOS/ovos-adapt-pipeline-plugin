@@ -14,8 +14,8 @@
 #
 
 import time
-from adapt.expander import BronKerboschExpander
-from adapt.tools.text.trie import Trie
+from ovos_adapt.expander import BronKerboschExpander
+from ovos_adapt.tools.text.trie import Trie
 
 __author__ = 'seanfitz'
 

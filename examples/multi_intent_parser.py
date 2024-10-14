@@ -10,8 +10,8 @@ PYTHONPATH=. python examples/multi_intent_parser.py "play some music by the clas
 
 import json
 import sys
-from adapt.intent import IntentBuilder
-from adapt.engine import IntentDeterminationEngine
+from ovos_adapt.intent import IntentBuilder
+from ovos_adapt.engine import IntentDeterminationEngine
 
 engine = IntentDeterminationEngine()
 
