@@ -213,6 +213,7 @@ class AdaptPipeline(PipelinePlugin):
             return None
 
         lang = standardize_lang_tag(lang or self.lang)
+        # TODO - allow close langs, match dialects
         if lang not in self.engines:
             return None
 
