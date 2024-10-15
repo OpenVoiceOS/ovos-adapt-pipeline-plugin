@@ -25,6 +25,7 @@ from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
 from ovos_utils.log import LOG
+from ovos_utils.lang import standardize_lang_tag
 
 
 def _entity_skill_id(skill_id):
@@ -47,12 +48,13 @@ class AdaptPipeline(PipelinePlugin):
 
     def __init__(self, config=None):
         core_config = Configuration()
-        self.config = config or core_config.get("context", {})  # legacy mycroft-core path
-        self.lang = core_config.get("lang", "en-us")
+        config = config or core_config.get("context", {})  # legacy mycroft-core path
+        super().__init__(config)
+        self.lang = standardize_lang_tag(core_config.get("lang", "en-US"))
         langs = core_config.get('secondary_langs') or []
         if self.lang not in langs:
             langs.append(self.lang)
-
+        langs = [standardize_lang_tag(l) for l in langs]
         self.engines = {lang: IntentDeterminationEngine()
                         for lang in langs}
 
@@ -210,7 +212,7 @@ class AdaptPipeline(PipelinePlugin):
             LOG.error(f"utterance exceeds max size of {self.max_words} words, skipping adapt match")
             return None
 
-        lang = lang or self.lang
+        lang = standardize_lang_tag(lang or self.lang)
         if lang not in self.engines:
             return None
 
@@ -256,18 +258,8 @@ class AdaptPipeline(PipelinePlugin):
             ret = None
         return ret
 
-    def register_vocab(self, start_concept, end_concept,
-                       alias_of, regex_str, lang):
-        """Register Vocabulary. DEPRECATED
-
-        This method should not be used, it has been replaced by
-        register_vocabulary().
-        """
-        self.register_vocabulary(start_concept, end_concept, alias_of,
-                                 regex_str, lang)
-
-    def register_vocabulary(self, entity_value, entity_type,
-                            alias_of, regex_str, lang):
+    def register_vocabulary(self, entity_value:str, entity_type:str,
+                            alias_of:str, regex_str:str, lang: str):
         """Register skill vocabulary as adapt entity.
 
         This will handle both regex registration and registration of normal
@@ -279,6 +271,7 @@ class AdaptPipeline(PipelinePlugin):
             entity_type: the type/tag of an entity instance
             alias_of: entity this is an alternative for
         """
+        lang = standardize_lang_tag(lang)
         if lang in self.engines:
             with self.lock:
                 if regex_str:
