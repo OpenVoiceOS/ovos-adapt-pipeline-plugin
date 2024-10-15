@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.1.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/0.1.1a1) (2024-10-14)
+## [0.1.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/0.1.2a1) (2024-10-15)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/0.1.0...0.1.1a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/0.1.1...0.1.2a1)
 
 **Merged pull requests:**
 
-- refactor:upstream classes [\#6](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/6) ([JarbasAl](https://github.com/JarbasAl))
+- allow workshop 1.0.0 [\#8](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/8) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
