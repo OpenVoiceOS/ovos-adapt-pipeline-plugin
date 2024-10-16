@@ -17,18 +17,18 @@ from functools import lru_cache
 from threading import Lock
 from typing import List, Optional, Iterable, Union, Dict
 
-from ovos_bus_client.client import MessageBusClient
-from ovos_utils.fakebus import FakeBus
-
 from langcodes import closest_match
+from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
-from ovos_bus_client.session import IntentContextManager as ContextManager, \
-    SessionManager
+from ovos_bus_client.session import SessionManager
+from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentMatch, ConfidenceMatcherPipeline
 from ovos_utils import flatten_list
+from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
+from ovos_workshop.intents import open_intent_envelope
 
 from ovos_adapt.engine import IntentDeterminationEngine
 
@@ -65,6 +65,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                         for lang in langs}
 
         self.lock = Lock()
+        self.registered_vocab = []
         self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
 
         # TODO sanitize config option
@@ -72,61 +73,14 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         self.conf_med = self.config.get("conf_med") or 0.45
         self.conf_low = self.config.get("conf_low") or 0.25
 
-    @property
-    def context_keywords(self):
-        LOG.warning(
-            "self.context_keywords has been deprecated and is unused, use self.config.get('keywords', []) instead")
-        return self.config.get('keywords', [])
+        self.bus.on('register_vocab', self.handle_register_vocab)
+        self.bus.on('register_intent', self.handle_register_intent)
+        self.bus.on('detach_intent', self.handle_detach_intent)
+        self.bus.on('detach_skill', self.handle_detach_skill)
 
-    @context_keywords.setter
-    def context_keywords(self, val):
-        LOG.warning(
-            "self.context_keywords has been deprecated and is unused, edit mycroft.conf instead, setter will be ignored")
-
-    @property
-    def context_max_frames(self):
-        LOG.warning(
-            "self.context_keywords has been deprecated and is unused, use self.config.get('max_frames', 3) instead")
-        return self.config.get('max_frames', 3)
-
-    @context_max_frames.setter
-    def context_max_frames(self, val):
-        LOG.warning(
-            "self.context_max_frames has been deprecated and is unused, edit mycroft.conf instead, setter will be ignored")
-
-    @property
-    def context_timeout(self):
-        LOG.warning("self.context_timeout has been deprecated and is unused, use self.config.get('timeout', 2) instead")
-        return self.config.get('timeout', 2)
-
-    @context_timeout.setter
-    def context_timeout(self, val):
-        LOG.warning(
-            "self.context_timeout has been deprecated and is unused, edit mycroft.conf instead, setter will be ignored")
-
-    @property
-    def context_greedy(self):
-        LOG.warning(
-            "self.context_greedy has been deprecated and is unused, use self.config.get('greedy', False) instead")
-        return self.config.get('greedy', False)
-
-    @context_greedy.setter
-    def context_greedy(self, val):
-        LOG.warning(
-            "self.context_greedy has been deprecated and is unused, edit mycroft.conf instead, setter will be ignored")
-
-    @property
-    def context_manager(self):
-        LOG.warning("context_manager has been deprecated, use Session.context instead")
-        sess = SessionManager.get()
-        return sess.context
-
-    @context_manager.setter
-    def context_manager(self, val):
-        LOG.warning("context_manager has been deprecated, use Session.context instead")
-        assert isinstance(val, ContextManager)
-        sess = SessionManager.get()
-        sess.context = val
+        self.bus.on('intent.service.adapt.get', self.handle_get_adapt)
+        self.bus.on('intent.service.adapt.manifest.get', self.handle_adapt_manifest)
+        self.bus.on('intent.service.adapt.vocab.manifest.get', self.handle_vocab_manifest)
 
     def update_context(self, intent):
         """Updates context with keyword from the intent.
@@ -364,3 +318,81 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         for lang in self.engines:
             parsers = self.engines[lang].intent_parsers
             self.engines[lang].drop_intent_parser(parsers)
+
+    @property
+    def registered_intents(self):
+        lang = get_message_lang()
+        return [parser.__dict__ for parser in self.engines[lang].intent_parsers]
+
+    def handle_register_vocab(self, message):
+        """Register adapt vocabulary.
+
+        Args:
+            message (Message): message containing vocab info
+        """
+        entity_value = message.data.get('entity_value')
+        entity_type = message.data.get('entity_type')
+        regex_str = message.data.get('regex')
+        alias_of = message.data.get('alias_of')
+        lang = get_message_lang(message)
+        self.register_vocabulary(entity_value, entity_type,
+                                 alias_of, regex_str, lang)
+        self.registered_vocab.append(message.data)
+
+    def handle_register_intent(self, message):
+        """Register adapt intent.
+
+        Args:
+            message (Message): message containing intent info
+        """
+        intent = open_intent_envelope(message)
+        self.register_intent(intent)
+
+    def handle_detach_intent(self, message):
+        """Remover adapt intent.
+
+        Args:
+            message (Message): message containing intent info
+        """
+        intent_name = message.data.get('intent_name')
+        self.detach_intent(intent_name)
+
+    def handle_detach_skill(self, message):
+        """Remove all intents registered for a specific skill.
+
+        Args:
+            message (Message): message containing intent info
+        """
+        skill_id = message.data.get('skill_id')
+        self.detach_skill(skill_id)
+
+    def handle_get_adapt(self, message: Message):
+        """handler getting the adapt response for an utterance.
+
+        Args:
+            message (Message): message containing utterance
+        """
+        utterance = message.data["utterance"]
+        lang = get_message_lang(message)
+        intent = self.match_intent((utterance,), lang, message.serialize())
+        intent_data = intent.intent_data if intent else None
+        self.bus.emit(message.reply("intent.service.adapt.reply",
+                                    {"intent": intent_data}))
+
+    def handle_adapt_manifest(self, message):
+        """Send adapt intent manifest to caller.
+
+        Argument:
+            message: query message to reply to.
+        """
+        self.bus.emit(message.reply("intent.service.adapt.manifest",
+                                    {"intents": self.registered_intents}))
+
+    def handle_vocab_manifest(self, message):
+        """Send adapt vocabulary manifest to caller.
+
+        Argument:
+            message: query message to reply to.
+        """
+        self.bus.emit(message.reply("intent.service.adapt.vocab.manifest",
+                                    {"vocab": self.registered_vocab}))
