@@ -15,14 +15,17 @@
 """An intent parsing service using the Adapt parser."""
 from functools import lru_cache
 from threading import Lock
-from typing import List, Tuple, Optional
+from typing import List, Optional, Iterable, Union, Dict
+
+from ovos_bus_client.client import MessageBusClient
+from ovos_utils.fakebus import FakeBus
 
 from langcodes import closest_match
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import IntentContextManager as ContextManager, \
     SessionManager
 from ovos_config.config import Configuration
-from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
+from ovos_plugin_manager.templates.pipeline import IntentMatch, ConfidenceMatcherPipeline
 from ovos_utils import flatten_list
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
@@ -45,13 +48,14 @@ def _entity_skill_id(skill_id):
     return skill_id
 
 
-class AdaptPipeline(PipelinePlugin):
+class AdaptPipeline(ConfidenceMatcherPipeline):
     """Intent service wrapping the Adapt intent Parser."""
 
-    def __init__(self, config=None):
+    def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+                 config: Optional[Dict] = None):
         core_config = Configuration()
         config = config or core_config.get("context", {})  # legacy mycroft-core path
-        super().__init__(config)
+        super().__init__(bus, config)
         self.lang = standardize_lang_tag(core_config.get("lang", "en-US"))
         langs = core_config.get('secondary_langs') or []
         if self.lang not in langs:
@@ -139,9 +143,7 @@ class AdaptPipeline(PipelinePlugin):
         ents = [tag['entities'][0] for tag in intent['__tags__'] if 'entities' in tag]
         sess.context.update_context(ents)
 
-    def match_high(self, utterances: List[str],
-                   lang: Optional[str] = None,
-                   message: Optional[Message] = None):
+    def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """Intent matcher for high confidence.
 
         Args:
@@ -153,9 +155,7 @@ class AdaptPipeline(PipelinePlugin):
             return match
         return None
 
-    def match_medium(self, utterances: List[str],
-                     lang: Optional[str] = None,
-                     message: Optional[Message] = None):
+    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """Intent matcher for medium confidence.
 
         Args:
@@ -167,9 +167,7 @@ class AdaptPipeline(PipelinePlugin):
             return match
         return None
 
-    def match_low(self, utterances: List[str],
-                  lang: Optional[str] = None,
-                  message: Optional[Message] = None):
+    def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
         """Intent matcher for low confidence.
 
         Args:
@@ -182,7 +180,7 @@ class AdaptPipeline(PipelinePlugin):
         return None
 
     @lru_cache(maxsize=3)  # NOTE - message is a string because of this
-    def match_intent(self, utterances: Tuple[str],
+    def match_intent(self, utterances: Iterable[str],
                      lang: Optional[str] = None,
                      message: Optional[str] = None):
         """Run the Adapt engine to search for an matching intent.
@@ -253,8 +251,9 @@ class AdaptPipeline(PipelinePlugin):
 
             skill_id = best_intent['intent_type'].split(":")[0]
             ret = IntentMatch(
-                'Adapt', best_intent['intent_type'], best_intent, skill_id,
-                best_intent['utterance']
+                match_type=best_intent['intent_type'],
+                match_data=best_intent, skill_id=skill_id,
+                utterance=best_intent['utterance']
             )
         else:
             ret = None
