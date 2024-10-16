@@ -23,7 +23,7 @@ from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
-from ovos_plugin_manager.templates.pipeline import IntentMatch, ConfidenceMatcherPipeline
+from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
@@ -97,7 +97,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         ents = [tag['entities'][0] for tag in intent['__tags__'] if 'entities' in tag]
         sess.context.update_context(ents)
 
-    def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """Intent matcher for high confidence.
 
         Args:
@@ -109,7 +109,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             return match
         return None
 
-    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """Intent matcher for medium confidence.
 
         Args:
@@ -121,7 +121,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             return match
         return None
 
-    def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentMatch]:
+    def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """Intent matcher for low confidence.
 
         Args:
@@ -204,7 +204,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             sess.context.update_context(ents)
 
             skill_id = best_intent['intent_type'].split(":")[0]
-            ret = IntentMatch(
+            ret = IntentHandlerMatch(
                 match_type=best_intent['intent_type'],
                 match_data=best_intent, skill_id=skill_id,
                 utterance=best_intent['utterance']
