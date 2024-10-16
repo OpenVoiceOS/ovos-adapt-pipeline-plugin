@@ -1,12 +1,12 @@
 # Changelog
 
-## [0.1.3a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/0.1.3a1) (2024-10-16)
+## [1.0.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.0.0a1) (2024-10-16)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/0.1.2...0.1.3a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/0.1.3...1.0.0a1)
 
-**Merged pull requests:**
+**Breaking changes:**
 
-- fix:standardize\_lang [\#10](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/10) ([JarbasAl](https://github.com/JarbasAl))
+- feat:pipeline plugin factory [\#12](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/12) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
