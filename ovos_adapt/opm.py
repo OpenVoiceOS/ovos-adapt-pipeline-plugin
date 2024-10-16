@@ -17,14 +17,17 @@ from functools import lru_cache
 from threading import Lock
 from typing import List, Tuple, Optional
 
-from ovos_adapt.engine import IntentDeterminationEngine
+from langcodes import closest_match
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import IntentContextManager as ContextManager, \
     SessionManager
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentMatch, PipelinePlugin
 from ovos_utils import flatten_list
+from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
+
+from ovos_adapt.engine import IntentDeterminationEngine
 
 
 def _entity_skill_id(skill_id):
@@ -47,12 +50,13 @@ class AdaptPipeline(PipelinePlugin):
 
     def __init__(self, config=None):
         core_config = Configuration()
-        self.config = config or core_config.get("context", {})  # legacy mycroft-core path
-        self.lang = core_config.get("lang", "en-us")
+        config = config or core_config.get("context", {})  # legacy mycroft-core path
+        super().__init__(config)
+        self.lang = standardize_lang_tag(core_config.get("lang", "en-US"))
         langs = core_config.get('secondary_langs') or []
         if self.lang not in langs:
             langs.append(self.lang)
-
+        langs = [standardize_lang_tag(l) for l in langs]
         self.engines = {lang: IntentDeterminationEngine()
                         for lang in langs}
 
@@ -210,8 +214,8 @@ class AdaptPipeline(PipelinePlugin):
             LOG.error(f"utterance exceeds max size of {self.max_words} words, skipping adapt match")
             return None
 
-        lang = lang or self.lang
-        if lang not in self.engines:
+        lang = self._get_closest_lang(lang)
+        if lang is None:  # no intents registered for this lang
             return None
 
         best_intent = {}
@@ -256,18 +260,20 @@ class AdaptPipeline(PipelinePlugin):
             ret = None
         return ret
 
-    def register_vocab(self, start_concept, end_concept,
-                       alias_of, regex_str, lang):
-        """Register Vocabulary. DEPRECATED
+    def _get_closest_lang(self, lang: str) -> Optional[str]:
+        if self.engines:
+            lang = standardize_lang_tag(lang)
+            closest, score = closest_match(lang, list(self.engines.keys()))
+            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
+            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
+            # 1- 3 -> These codes indicate a minor regional difference.
+            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
+            if score < 10:
+                return closest
+        return None
 
-        This method should not be used, it has been replaced by
-        register_vocabulary().
-        """
-        self.register_vocabulary(start_concept, end_concept, alias_of,
-                                 regex_str, lang)
-
-    def register_vocabulary(self, entity_value, entity_type,
-                            alias_of, regex_str, lang):
+    def register_vocabulary(self, entity_value: str, entity_type: str,
+                            alias_of: str, regex_str: str, lang: str):
         """Register skill vocabulary as adapt entity.
 
         This will handle both regex registration and registration of normal
@@ -279,6 +285,7 @@ class AdaptPipeline(PipelinePlugin):
             entity_type: the type/tag of an entity instance
             alias_of: entity this is an alternative for
         """
+        lang = standardize_lang_tag(lang)
         if lang in self.engines:
             with self.lock:
                 if regex_str:
