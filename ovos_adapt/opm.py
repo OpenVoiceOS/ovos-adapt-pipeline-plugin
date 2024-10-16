@@ -375,7 +375,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         utterance = message.data["utterance"]
         lang = get_message_lang(message)
         intent = self.match_intent((utterance,), lang, message.serialize())
-        intent_data = intent.intent_data if intent else None
+        intent_data = intent.match_data if intent else None
         self.bus.emit(message.reply("intent.service.adapt.reply",
                                     {"intent": intent_data}))
 
