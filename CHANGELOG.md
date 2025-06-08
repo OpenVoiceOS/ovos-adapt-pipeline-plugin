@@ -1,12 +1,12 @@
 # Changelog
 
-## [1.0.5a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.0.5a1) (2024-11-19)
+## [1.0.6a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.0.6a1) (2025-06-08)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.0.4...1.0.5a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.0.5...1.0.6a1)
 
 **Merged pull requests:**
 
-- fix:allow\_workshop\_300 [\#21](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/21) ([JarbasAl](https://github.com/JarbasAl))
+- fix: compatibility with ovos-workshop 7.X.X [\#24](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/24) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
