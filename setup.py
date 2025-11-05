@@ -64,7 +64,7 @@ def required(requirements_file):
 PLUGIN_ENTRY_POINT = 'ovos-adapt-pipeline-plugin=ovos_adapt.opm:AdaptPipeline'
 
 setup(
-    name="ovos-adapt-parser",
+    name="ovos_adapt_parser",
     version=get_version(),
     author="Sean Fitzgerald",
     description="A text-to-intent parsing framework.",
