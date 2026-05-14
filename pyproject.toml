@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ovos_adapt_parser"
+dynamic = ["version"]
+description = "A text-to-intent parsing framework."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE.md"]
+authors = [{ name = "Sean Fitzgerald" }]
+keywords = ["natural language processing", "intent", "nlp", "ovos"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Text Processing :: Linguistic",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "six>=1.10.0",
+    "ovos-plugin-manager>=0.5.0,<3.0.0",
+    "ovos-workshop>=0.1.7,<9.0.0",
+    "ovos-utils>=0.3.4,<1.0.0",
+    "langcodes",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov"]
+
+[project.urls]
+Homepage = "https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin"
+
+[project.entry-points."opm.pipeline"]
+"ovos-adapt-pipeline-plugin" = "ovos_adapt.opm:AdaptPipeline"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ovos_adapt*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ovos_adapt.version.__version__" }
