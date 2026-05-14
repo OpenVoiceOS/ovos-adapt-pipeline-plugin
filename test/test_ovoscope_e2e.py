@@ -72,14 +72,14 @@ class TestRegisteredIntentMatch(_AdaptHarness):
         self.expect_no_match("turn off the lights")
 
     def test_utterance_field_preserved(self):
-        self._vocab("TurnOn", ["on", "enable"])
+        self._vocab("TurnOn", ["enable", "activate"])
         self._vocab("Light", ["light", "lights"])
         self._intent(
             IntentBuilder(f"{self.SKILL_ID}:lights_on")
             .require(f"{self.SKILL_ID}:TurnOn")
             .require(f"{self.SKILL_ID}:Light")
         )
-        utterance = "turn on the lights"
+        utterance = "enable the lights"
         msg = self.send_and_capture(utterance, expected_types=[f"{self.SKILL_ID}:lights_on"])
         self.assertIsNotNone(msg)
         self.assertEqual(msg.data.get("utterance"), utterance)
