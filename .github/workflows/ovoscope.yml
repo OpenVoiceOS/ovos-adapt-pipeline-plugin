@@ -13,8 +13,7 @@ jobs:
   e2e:
     uses: OpenVoiceOS/gh-automations/.github/workflows/ovoscope.yml@dev
     with:
-      # Repo has no `[test]` extras — install plain. pytest is pulled by ovoscope.
-      install_extras: ""
+      install_extras: "test"
       test_path: "test/test_ovoscope_e2e.py"
       require_adapt: true
       # Validate against the unreleased ovoscope dev branch (E2EPipelineHarness).
