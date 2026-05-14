@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.1.0a1) (2026-05-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.0.10a2...1.1.0a1)
+
+**Merged pull requests:**
+
+- feat\(test\): ovoscope end-to-end tests for AdaptPipeline [\#34](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/34) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.0.10a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.0.10a2) (2026-04-09)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.0.9...1.0.10a2)
