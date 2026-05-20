@@ -30,7 +30,7 @@ from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_workshop.intents import open_intent_envelope
 
-from ovos_adapt.engine import IntentDeterminationEngine
+from ovos_adapt.engine import IntentDeterminationEngine, DomainIntentDeterminationEngine
 
 
 def _entity_skill_id(skill_id):
@@ -396,3 +396,215 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         """
         self.bus.emit(message.reply("intent.service.adapt.vocab.manifest",
                                     {"vocab": self.registered_vocab}))
+
+
+def _domain_from_intent_name(intent_name: str) -> str:
+    """Extract skill_id domain from an intent label.
+
+    Intent labels follow the ``skill_id:intent_name`` convention. If no
+    ``:`` is present the full label is used as the domain.
+    """
+    if not intent_name:
+        return ""
+    return intent_name.split(":", 1)[0] if ":" in intent_name else intent_name
+
+
+class DomainAdaptPipeline(AdaptPipeline):
+    """Adapt pipeline backed by ``DomainIntentDeterminationEngine``.
+
+    Unlike :class:`AdaptPipeline`, this variant maintains a dedicated
+    per-skill ``IntentDeterminationEngine`` (a "domain"). At match time,
+    every domain is scored in parallel and a global ``nlargest`` selects
+    the winner — no top-level router is involved.
+
+    Intent registrations are routed to the right domain based on the
+    ``skill_id`` prefix of the intent label (``skill_id:intent_name``).
+    """
+
+    def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+                 config: Optional[Dict] = None):
+        core_config = Configuration()
+        # Use dedicated config section so users can tune this pipeline
+        # independently from the flat AdaptPipeline.
+        config = config or core_config.get("intents", {}).get(
+            "ovos_adapt_domain_pipeline", {})
+        # Skip AdaptPipeline.__init__ to avoid building a flat engine; call
+        # the grandparent initializer directly.
+        ConfidenceMatcherPipeline.__init__(self, bus, config)
+        self.lang = standardize_lang_tag(core_config.get("lang", "en-US"))
+        langs = core_config.get('secondary_langs') or []
+        if self.lang not in langs:
+            langs.append(self.lang)
+        langs = [standardize_lang_tag(l) for l in langs]
+        self.engines = {lang: DomainIntentDeterminationEngine()
+                        for lang in langs}
+
+        self.lock = Lock()
+        self.registered_vocab = []
+        self.max_words = 50
+
+        self.conf_high = self.config.get("conf_high") or 0.65
+        self.conf_med = self.config.get("conf_med") or 0.45
+        self.conf_low = self.config.get("conf_low") or 0.25
+
+        # Maps lang -> entity_type_prefix -> domain (skill_id). Allows the
+        # vocab/regex registration handlers, which only see entity_type, to
+        # route to the correct domain.
+        self._entity_domain_index: Dict[str, Dict[str, str]] = {
+            lang: {} for lang in langs
+        }
+
+        self.bus.on('register_vocab', self.handle_register_vocab)
+        self.bus.on('register_intent', self.handle_register_intent)
+        self.bus.on('detach_intent', self.handle_detach_intent)
+        self.bus.on('detach_skill', self.handle_detach_skill)
+
+        self.bus.on('intent.service.adapt.get', self.handle_get_adapt)
+        self.bus.on('intent.service.adapt.manifest.get', self.handle_adapt_manifest)
+        self.bus.on('intent.service.adapt.vocab.manifest.get', self.handle_vocab_manifest)
+
+    def _resolve_entity_domain(self, lang: str, entity_type: str) -> str:
+        """Best-effort lookup of the domain that owns an entity_type.
+
+        Vocab/regex registrations don't carry ``skill_id`` directly; we map
+        them by entity_type prefix populated when intents are registered.
+        Falls back to the entity_type itself if no match is found.
+        """
+        index = self._entity_domain_index.get(lang, {})
+        # exact match first
+        if entity_type in index:
+            return index[entity_type]
+        # longest-prefix match (entity_type often == "<skill_id_norm><Name>")
+        best = ""
+        for prefix, domain in index.items():
+            if entity_type.startswith(prefix) and len(prefix) > len(best):
+                best = prefix
+        if best:
+            return index[best]
+        return entity_type
+
+    @lru_cache(maxsize=3)
+    def match_intent(self, utterances: Iterable[str],
+                     lang: Optional[str] = None,
+                     message: Optional[str] = None):
+        """Run all per-domain engines in parallel, take the global argmax.
+
+        ``DomainIntentDeterminationEngine.determine_intent`` does not
+        propagate ``include_tags``/``context_manager`` to its sub-engines,
+        so we iterate sub-engines manually to preserve adapt's contextual
+        scoring behaviour.
+        """
+        if message:
+            message = Message.deserialize(message)
+        sess = SessionManager.get(message)
+
+        utterances = flatten_list(utterances)
+        utterances = [u for u in utterances if len(u.split()) < self.max_words]
+        if not utterances:
+            LOG.error(f"utterance exceeds max size of {self.max_words} words, skipping adapt match")
+            return None
+
+        lang = self._get_closest_lang(lang)
+        if lang is None:
+            return None
+
+        best_intent = {}
+
+        def take_best(intent, utt):
+            nonlocal best_intent
+            best = best_intent.get('confidence', 0.0) if best_intent else 0.0
+            conf = intent.get('confidence', 0.0)
+            skill = intent['intent_type'].split(":")[0]
+            if best < conf and intent["intent_type"] not in sess.blacklisted_intents \
+                    and skill not in sess.blacklisted_skills:
+                best_intent = intent
+                best_intent['utterance'] = utt
+
+        engine = self.engines[lang]
+        for utt in utterances:
+            try:
+                candidates = []
+                for sub in engine.domains.values():
+                    for it in sub.determine_intent(
+                            utterance=utt, num_results=1,
+                            include_tags=True,
+                            context_manager=sess.context):
+                        candidates.append(it)
+                if candidates:
+                    utt_best = max(candidates,
+                                   key=lambda x: x.get('confidence', 0.0))
+                    take_best(utt_best, utt)
+            except Exception as err:
+                LOG.exception(err)
+
+        if best_intent:
+            ents = [tag['entities'][0] for tag in best_intent['__tags__']
+                    if 'entities' in tag]
+            sess.context.update_context(ents)
+            skill_id = best_intent['intent_type'].split(":")[0]
+            return IntentHandlerMatch(
+                match_type=best_intent['intent_type'],
+                match_data=best_intent, skill_id=skill_id,
+                utterance=best_intent['utterance']
+            )
+        return None
+
+    def register_intent(self, intent):
+        """Register a new intent with the per-domain engine."""
+        domain = _domain_from_intent_name(intent.name)
+        # Track entity_type prefix -> domain so vocab registrations can
+        # be routed to the same engine.
+        norm = _entity_skill_id(domain + ".")  # mimic skill_id formatting
+        for lang in self.engines:
+            with self.lock:
+                self.engines[lang].register_intent_parser(intent, domain=domain)
+                self._entity_domain_index[lang][norm] = domain
+
+    def register_vocabulary(self, entity_value: str, entity_type: str,
+                            alias_of: str, regex_str: str, lang: str):
+        """Register skill vocabulary, routed by entity_type to a domain."""
+        lang = standardize_lang_tag(lang)
+        if lang in self.engines:
+            with self.lock:
+                domain = self._resolve_entity_domain(
+                    lang, entity_type if not regex_str else regex_str)
+                if regex_str:
+                    self.engines[lang].register_regex_entity(
+                        regex_str, domain=domain)
+                else:
+                    self.engines[lang].register_entity(
+                        entity_value, entity_type, alias_of=alias_of,
+                        domain=domain)
+
+    def detach_skill(self, skill_id):
+        """Drop the whole domain for a skill."""
+        with self.lock:
+            for lang in self.engines:
+                if skill_id in self.engines[lang].domains:
+                    del self.engines[lang].domains[skill_id]
+                # also drop any entity prefix index entries pointing here
+                idx = self._entity_domain_index.get(lang, {})
+                for prefix in [p for p, d in idx.items() if d == skill_id]:
+                    idx.pop(prefix, None)
+
+    def detach_intent(self, intent_name):
+        """Detach a single intent from its owning domain."""
+        domain = _domain_from_intent_name(intent_name)
+        for lang in self.engines:
+            engine = self.engines[lang]
+            if domain in engine.domains:
+                sub = engine.domains[domain]
+                sub.intent_parsers = [p for p in sub.intent_parsers
+                                      if p.name != intent_name]
+
+    def shutdown(self):
+        for lang in self.engines:
+            self.engines[lang].domains = {}
+
+    @property
+    def registered_intents(self):
+        lang = get_message_lang()
+        out = []
+        for sub in self.engines[lang].domains.values():
+            out.extend(parser.__dict__ for parser in sub.intent_parsers)
+        return out

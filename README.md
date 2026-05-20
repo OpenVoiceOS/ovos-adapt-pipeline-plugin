@@ -4,7 +4,14 @@ Adapt Intent Parser
 ==================
 The Adapt Intent Parser is a flexible and extensible intent definition and determination framework. It is intended to parse natural language text into a structured intent that can then be invoked programatically.
 
-This repository contains a OVOS pipeline plugin and bundles a fork of the original [adapt-parser](https://github.com/MycroftAI/adapt) from the defunct MycroftAI
+This repository contains a OVOS pipeline plugin and bundles a fork of the original [adapt-parser](https://github.com/MycroftAI/adapt) from the defunct MycroftAI.
+
+Pipeline Plugins
+----------------
+Two OPM pipeline entry points are exposed:
+
+- `ovos-adapt-pipeline-plugin` (`AdaptPipeline`) — the flat pipeline, wrapping a single `IntentDeterminationEngine`. All skills share one trie.
+- `ovos-adapt-domain-pipeline-plugin` (`DomainAdaptPipeline`) — a per-skill pipeline wrapping `DomainIntentDeterminationEngine`. Each `skill_id` gets its own sub-engine ("domain"); at match time every domain is scored in parallel and a global argmax wins. Configurable under `intents.ovos_adapt_domain_pipeline` (`conf_high`, `conf_med`, `conf_low`).
 
 Documentation
 =============
