@@ -25,8 +25,9 @@ from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 from ovos_utils import flatten_list
-from ovos_utils.bracket_expansion import expand_template
 from ovos_utils.fakebus import FakeBus
+
+from ovos_adapt._bracket_expansion import expand_template
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_workshop.intents import open_intent_envelope

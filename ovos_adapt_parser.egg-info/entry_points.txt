@@ -1,0 +1,2 @@
+[opm.pipeline]
+ovos-adapt-pipeline-plugin = ovos_adapt.opm:AdaptPipeline
