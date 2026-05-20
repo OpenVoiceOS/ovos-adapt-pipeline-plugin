@@ -253,15 +253,11 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                     # surface forms before handing them to the adapt engine.
                     if entity_value and any(c in entity_value
                                             for c in "([{"):
-                        variants = [" ".join(v.split()) for v in
+                        variants = {" ".join(v.split()) for v in
                                     expand_template(entity_value)
-                                    if v and v.strip()]
-                        # de-duplicate while preserving order
-                        seen = set()
-                        variants = [v for v in variants
-                                    if not (v in seen or seen.add(v))]
+                                    if v and v.strip()}
                     else:
-                        variants = [entity_value]
+                        variants = {entity_value}
                     for variant in variants:
                         self.engines[lang].register_entity(
                             variant, entity_type, alias_of=alias_of)
