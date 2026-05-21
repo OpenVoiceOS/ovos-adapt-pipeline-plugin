@@ -13,15 +13,50 @@
 # limitations under the License.
 #
 
+import itertools
 import re
 import heapq
-from ovos_utils.bracket_expansion import expand_template
+from typing import List
+
 from ovos_adapt.entity_tagger import EntityTagger
 from ovos_adapt.parser import Parser
 from ovos_adapt.tools.text.tokenizer import EnglishTokenizer
 from ovos_adapt.tools.text.trie import Trie
 
 __author__ = 'seanfitz'
+
+
+def expand_template(template: str) -> List[str]:
+    """Expand OVOS template syntax into all concrete surface forms.
+
+    ``(a|b)`` alternatives and ``[opt]`` optionals are expanded into the
+    full list of sentences they describe.
+    """
+    def expand_optional(text):
+        return re.sub(r"\[([^\[\]]+)\]", lambda m: f"({m.group(1)}|)", text)
+
+    def expand_alternatives(text):
+        parts = []
+        for segment in re.split(r"(\([^\(\)]+\))", text):
+            if segment.startswith("(") and segment.endswith(")"):
+                parts.append(segment[1:-1].split("|"))
+            else:
+                parts.append([segment])
+        return itertools.product(*parts)
+
+    def fully_expand(texts):
+        result = set(texts)
+        while True:
+            expanded = set()
+            for text in result:
+                for option in expand_alternatives(text):
+                    expanded.add("".join(option).strip())
+            if expanded == result:
+                break
+            result = expanded
+        return sorted(result)
+
+    return fully_expand([expand_optional(template)])
 
 
 class IntentDeterminationEngine(object):
