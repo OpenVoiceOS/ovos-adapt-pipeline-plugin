@@ -182,7 +182,7 @@ def summary(rows):
               f"{m['recall']:>6.1%} {m['f1']:>5.3f}  {tn_frac:>8}  "
               f"{m['fp']:>4}  {m['fn']:>4}  {median_lat:>6.2f}ms")
     print(f"{'─' * 84}")
-    print(f"  TN/NM = true negatives / total no-match cases (correctly returned nothing)")
+    print("  TN/NM = true negatives / total no-match cases (correctly returned nothing)")
 
 
 # ── main ───────────────────────────────────────────────────────────────────
