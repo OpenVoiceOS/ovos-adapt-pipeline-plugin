@@ -25,7 +25,6 @@ from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
 from ovos_utils import flatten_list
-from ovos_utils.bracket_expansion import expand_template
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
@@ -245,21 +244,8 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                 if regex_str:
                     self.engines[lang].register_regex_entity(regex_str)
                 else:
-                    # Support OVOS template syntax in vocab entries:
-                    #   (a|b)   -> alternatives
-                    #   [opt]   -> optionals
-                    # Expand a single bracketed template into all concrete
-                    # surface forms before handing them to the adapt engine.
-                    if entity_value and any(c in entity_value
-                                            for c in "([{"):
-                        variants = {" ".join(v.split()) for v in
-                                    expand_template(entity_value)
-                                    if v and v.strip()}
-                    else:
-                        variants = {entity_value}
-                    for variant in variants:
-                        self.engines[lang].register_entity(
-                            variant, entity_type, alias_of=alias_of)
+                    self.engines[lang].register_entity(
+                        entity_value, entity_type, alias_of=alias_of)
 
     def register_intent(self, intent):
         """Register new intent with adapt engine.

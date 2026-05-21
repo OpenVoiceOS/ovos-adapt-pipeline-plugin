@@ -15,6 +15,7 @@
 
 import re
 import heapq
+from ovos_utils.bracket_expansion import expand_template
 from ovos_adapt.entity_tagger import EntityTagger
 from ovos_adapt.parser import Parser
 from ovos_adapt.tools.text.tokenizer import EnglishTokenizer
@@ -154,14 +155,25 @@ class IntentDeterminationEngine(object):
         """
         Register an entity to be tagged in potential parse results
 
+        OVOS template syntax is supported in entity_value: ``(a|b)``
+        alternatives and ``[opt]`` optionals are expanded into all concrete
+        surface forms, each registered as a separate trie entry.
+
         Args:
             entity_value(str): the value/proper name of an entity instance (Ex: "The Big Bang Theory")
             entity_type(str): the type/tag of an entity instance (Ex: "Television Show")
         """
-        if alias_of:
-            self.trie.insert(entity_value.lower(), data=(alias_of, entity_type))
+        if entity_value and any(c in entity_value for c in "(["):
+            variants = {" ".join(v.split()) for v in expand_template(entity_value)
+                        if v and v.strip()}
         else:
-            self.trie.insert(entity_value.lower(), data=(entity_value, entity_type))
+            variants = {entity_value}
+        for variant in variants:
+            if alias_of:
+                self.trie.insert(variant.lower(), data=(alias_of, entity_type))
+            else:
+                self.trie.insert(variant.lower(), data=(variant, entity_type))
+        if not alias_of:
             self.trie.insert(entity_type.lower(), data=(entity_type, 'Concept'))
 
     def register_regex_entity(self, regex_str):

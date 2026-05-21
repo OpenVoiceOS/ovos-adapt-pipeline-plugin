@@ -107,8 +107,7 @@ class TestPipeline(TestCase):
 
 class TestBracketExpansion(TestCase):
     """Verify that OVOS template syntax in vocab entries is expanded
-    via ovos_utils.bracket_expansion.expand_template before being
-    handed to the adapt engine."""
+    into concrete surface forms by the adapt engine's register_entity."""
 
     def setUp(self):
         self.adapt_pipeline = AdaptPipeline(mock.Mock())
