@@ -13,14 +13,50 @@
 # limitations under the License.
 #
 
+import itertools
 import re
 import heapq
+from typing import List
+
 from ovos_adapt.entity_tagger import EntityTagger
 from ovos_adapt.parser import Parser
 from ovos_adapt.tools.text.tokenizer import EnglishTokenizer
 from ovos_adapt.tools.text.trie import Trie
 
 __author__ = 'seanfitz'
+
+
+def expand_template(template: str) -> List[str]:
+    """Expand OVOS template syntax into all concrete surface forms.
+
+    ``(a|b)`` alternatives and ``[opt]`` optionals are expanded into the
+    full list of sentences they describe.
+    """
+    def expand_optional(text):
+        return re.sub(r"\[([^\[\]]+)\]", lambda m: f"({m.group(1)}|)", text)
+
+    def expand_alternatives(text):
+        parts = []
+        for segment in re.split(r"(\([^\(\)]+\))", text):
+            if segment.startswith("(") and segment.endswith(")"):
+                parts.append(segment[1:-1].split("|"))
+            else:
+                parts.append([segment])
+        return itertools.product(*parts)
+
+    def fully_expand(texts):
+        result = set(texts)
+        while True:
+            expanded = set()
+            for text in result:
+                for option in expand_alternatives(text):
+                    expanded.add("".join(option).strip())
+            if expanded == result:
+                break
+            result = expanded
+        return sorted(result)
+
+    return fully_expand([expand_optional(template)])
 
 
 class IntentDeterminationEngine(object):
@@ -154,14 +190,25 @@ class IntentDeterminationEngine(object):
         """
         Register an entity to be tagged in potential parse results
 
+        OVOS template syntax is supported in entity_value: ``(a|b)``
+        alternatives and ``[opt]`` optionals are expanded into all concrete
+        surface forms, each registered as a separate trie entry.
+
         Args:
             entity_value(str): the value/proper name of an entity instance (Ex: "The Big Bang Theory")
             entity_type(str): the type/tag of an entity instance (Ex: "Television Show")
         """
-        if alias_of:
-            self.trie.insert(entity_value.lower(), data=(alias_of, entity_type))
+        if entity_value and any(c in entity_value for c in "(["):
+            variants = {" ".join(v.split()) for v in expand_template(entity_value)
+                        if v and v.strip()}
         else:
-            self.trie.insert(entity_value.lower(), data=(entity_value, entity_type))
+            variants = {entity_value}
+        for variant in variants:
+            if alias_of:
+                self.trie.insert(variant.lower(), data=(alias_of, entity_type))
+            else:
+                self.trie.insert(variant.lower(), data=(variant, entity_type))
+        if not alias_of:
             self.trie.insert(entity_type.lower(), data=(entity_type, 'Concept'))
 
     def register_regex_entity(self, regex_str):

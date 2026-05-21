@@ -105,6 +105,38 @@ class TestPipeline(TestCase):
         self.assertEqual(reply.data['intent'], None)
 
 
+class TestBracketExpansion(TestCase):
+    """Verify that OVOS template syntax in vocab entries is expanded
+    into concrete surface forms by the adapt engine's register_entity."""
+
+    def setUp(self):
+        self.adapt_pipeline = AdaptPipeline(mock.Mock())
+        # Register a single templated vocab entry covering (a|b) and [opt]
+        msg = create_vocab_msg('lightAction',
+                               'turn (on|off) the [bright] lights')
+        self.adapt_pipeline.handle_register_vocab(msg)
+
+        intent = IntentBuilder('skill:lightsIntent').require('lightAction')
+        msg = Message('register_intent', intent.__dict__)
+        self.adapt_pipeline.handle_register_intent(msg)
+
+    def _match(self, utterance):
+        msg = Message('intent.service.adapt.get',
+                      data={'utterance': utterance})
+        self.adapt_pipeline.handle_get_adapt(msg)
+        return get_last_message(self.adapt_pipeline.bus).data['intent']
+
+    def test_alternative_and_optional_present(self):
+        intent = self._match('turn off the bright lights')
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent['intent_type'], 'skill:lightsIntent')
+
+    def test_alternative_and_optional_absent(self):
+        intent = self._match('turn on the lights')
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent['intent_type'], 'skill:lightsIntent')
+
+
 class TestAdaptIntent(TestCase):
     """Test the AdaptIntent wrapper."""
 
