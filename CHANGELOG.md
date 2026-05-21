@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.2.0a1) (2026-05-21)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.1.0a1...1.2.0a1)
+
+**Merged pull requests:**
+
+- feat: expand OVOS template syntax in vocab entries [\#36](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/36) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.1.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.1.0a1) (2026-05-14)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.0.10a2...1.1.0a1)
