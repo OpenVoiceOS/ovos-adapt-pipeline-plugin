@@ -1,15 +1,20 @@
 # Configuration
 
-## Entry point
+## Entry points
 
-The plugin is published under the OPM `opm.pipeline` entry point:
+The package publishes three OPM `opm.pipeline` entry points — the flat plugin
+and two domain-organised variants:
 
 ```toml
 [project.entry-points."opm.pipeline"]
 "ovos-adapt-pipeline-plugin" = "ovos_adapt.opm:AdaptPipeline"
+"ovos-adapt-domain-pipeline-plugin" = "ovos_adapt.opm:DomainAdaptPipeline"
+"ovos-adapt-hierarchical-pipeline-plugin" = "ovos_adapt.opm:HierarchicalAdaptPipeline"
 ```
 
-OVOS discovers it by that id — `ovos-adapt-pipeline-plugin`.
+OVOS discovers each by its id. This page covers the flat
+`ovos-adapt-pipeline-plugin`; the variants behave the same way and accept the
+same keys in their own config sections — see [Pipeline variants](pipelines.md).
 
 ## Enabling it in the pipeline
 

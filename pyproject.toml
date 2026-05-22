@@ -38,6 +38,8 @@ Homepage = "https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin"
 
 [project.entry-points."opm.pipeline"]
 "ovos-adapt-pipeline-plugin" = "ovos_adapt.opm:AdaptPipeline"
+"ovos-adapt-domain-pipeline-plugin" = "ovos_adapt.opm:DomainAdaptPipeline"
+"ovos-adapt-hierarchical-pipeline-plugin" = "ovos_adapt.opm:HierarchicalAdaptPipeline"
 
 [tool.setuptools.packages.find]
 where = ["."]
