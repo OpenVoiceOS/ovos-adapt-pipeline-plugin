@@ -90,18 +90,28 @@ Add an unrelated registered word — say `play` — and a fourth tag appears.
 though the command is unchanged. This dilution is the main reason scores differ
 between engine topologies (see below).
 
-## DomainIntentDeterminationEngine
+## Domain engines
 
-`DomainIntentDeterminationEngine` groups intents into **domains**, each backed
-by its own `IntentDeterminationEngine` — its own Trie, tagger, and parser set.
-Registration takes a `domain=` argument; `determine_intent` scores every domain
-and the caller takes the global argmax.
+Two engine classes group intents into **domains** — each domain backed by its
+own `IntentDeterminationEngine` (its own Trie, tagger, and parser set).
+Registration takes a `domain=` argument.
 
-Because each domain tags against only its own vocabulary, a domain's cliques
-carry fewer foreign tags, so the `len(tags)` dilution above is smaller than in a
-single flat engine. On a clean single-intent utterance this changes the score
-but not the winner; on utterances carrying several intents' keywords it can
-change which intent wins.
+**`DomainIntentDeterminationEngine`** scores every domain and the caller takes
+the global argmax. Because each domain tags against only its own vocabulary, a
+domain's cliques carry fewer foreign tags, so the `len(tags)` dilution above is
+smaller than in a single flat engine. On a clean single-intent utterance this
+changes the score but not the winner; on utterances carrying several intents'
+keywords it can change which intent wins.
+
+**`HierarchicalIntentDeterminationEngine`** subclasses the above and keeps the
+same registration API. Its `determine_intent` is two-stage: a `classify_domain`
+keyword-coverage classifier picks a single domain, then only that domain's
+sub-engine is scored. A misrouted domain cannot be recovered.
+
+The `DomainAdaptPipeline` and `HierarchicalAdaptPipeline` plugins wrap these two
+engines — see [Pipeline variants](pipelines.md). The
+[engine comparison reference](benchmark.md) measures how the three topologies
+diverge and explains why.
 
 ## Context
 

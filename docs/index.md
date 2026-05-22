@@ -20,8 +20,10 @@ start at [Concepts](concepts.md). If you just want it running, jump to the
 
 **Building on or extending the plugin:**
 
-5. [Bus protocol](bus-protocol.md) — the messagebus API skills use to register
-6. [Internals](internals.md) — the tagger, clique expansion, the confidence math
+5. [Pipeline variants](pipelines.md) — the flat, domain, and hierarchical plugins
+6. [Bus protocol](bus-protocol.md) — the messagebus API skills use to register
+7. [Internals](internals.md) — the tagger, clique expansion, the confidence math
+8. [Engine comparison reference](benchmark.md) — how the variants diverge
 
 ## At a glance
 

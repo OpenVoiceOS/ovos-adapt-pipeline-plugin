@@ -8,10 +8,13 @@ This repository contains a OVOS pipeline plugin and bundles a fork of the origin
 
 Pipeline Plugins
 ----------------
-Two OPM pipeline entry points are exposed:
+Three OPM pipeline entry points are exposed:
 
 - `ovos-adapt-pipeline-plugin` (`AdaptPipeline`) — the flat pipeline, wrapping a single `IntentDeterminationEngine`. All skills share one trie.
-- `ovos-adapt-domain-pipeline-plugin` (`DomainAdaptPipeline`) — a per-skill pipeline wrapping `DomainIntentDeterminationEngine`. Each `skill_id` gets its own sub-engine ("domain"); at match time every domain is scored in parallel and a global argmax wins. Configurable under `intents.ovos_adapt_domain_pipeline` (`conf_high`, `conf_med`, `conf_low`).
+- `ovos-adapt-domain-pipeline-plugin` (`DomainAdaptPipeline`) — a per-skill pipeline wrapping `DomainIntentDeterminationEngine`. Each `skill_id` gets its own sub-engine ("domain"); at match time every domain is scored in parallel and a global argmax wins. Configurable under `intents.ovos_adapt_domain_pipeline`.
+- `ovos-adapt-hierarchical-pipeline-plugin` (`HierarchicalAdaptPipeline`) — the per-skill domain model with two-stage routing: a stage-1 classifier picks one domain, then only that domain's sub-engine is scored. Configurable under `intents.ovos_adapt_hierarchical_pipeline`.
+
+See [Pipeline variants](docs/pipelines.md) for when to use each.
 
 Documentation
 =============
@@ -21,8 +24,10 @@ A zero-to-hero guide lives in [`docs/`](docs/index.md):
 - [Quickstart](docs/quickstart.md) — install, enable, match your first utterance
 - [Writing intents](docs/writing-intents.md) — the `IntentBuilder` API with examples
 - [Configuration](docs/configuration.md) — confidence tiers and every config key
+- [Pipeline variants](docs/pipelines.md) — the flat, domain, and hierarchical plugins
 - [Bus protocol](docs/bus-protocol.md) — the messagebus API skills register over
 - [Internals](docs/internals.md) — tagging, clique expansion, the confidence math
+- [Engine comparison reference](docs/benchmark.md) — how the variants diverge
 
 Examples
 ========
