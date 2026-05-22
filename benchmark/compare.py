@@ -144,7 +144,7 @@ def run_flat(cases):
 
     m = compute_metrics(results, cases)
     print_report("flat  —  IntentDeterminationEngine", m, latencies)
-    return m, statistics.median(latencies)
+    return m, statistics.median(latencies), results
 
 
 def run_domain(cases):
@@ -166,10 +166,34 @@ def run_domain(cases):
 
     m = compute_metrics(results, cases)
     print_report("domain  —  DomainIntentDeterminationEngine", m, latencies)
-    return m, statistics.median(latencies)
+    return m, statistics.median(latencies), results
 
 
 # ── summary table ──────────────────────────────────────────────────────────
+
+def head_to_head(cases, flat_results, domain_results):
+    """Report the cases where flat and domain predict a different intent."""
+    diffs = []
+    for (utt, expected), (fn, fc), (dn, dc) in zip(cases, flat_results,
+                                                   domain_results):
+        if fn != dn:
+            diffs.append((utt, expected, fn, fc, dn, dc))
+    print(f"\n\n{'=' * 66}")
+    print("  Head-to-head: flat vs domain")
+    print(f"{'=' * 66}")
+    print(f"  Cases             : {len(cases)}")
+    print(f"  Same prediction   : {len(cases) - len(diffs)}")
+    print(f"  Different          : {len(diffs)}")
+    if diffs:
+        print(f"\n  {'utterance':<44} {'expected':<16} {'flat':<16} {'domain':<16}")
+        print(f"  {'-' * 90}")
+        for utt, exp, fn, fc, dn, dc in diffs:
+            u = utt if len(utt) <= 42 else utt[:41] + "…"
+            print(f"  {u:<44} {exp or '—':<16} "
+                  f"{(fn or '—') + f' {fc:.2f}':<16} "
+                  f"{(dn or '—') + f' {dc:.2f}':<16}")
+    return len(diffs)
+
 
 def summary(rows):
     print(f"\n\n{'─' * 84}")
@@ -196,8 +220,9 @@ if __name__ == "__main__":
           f"across {len(VOCAB)} entity types")
 
     rows = []
-    m, lat = run_flat(cases)
+    m, lat, flat_results = run_flat(cases)
     rows.append(("flat", m, lat))
-    m, lat = run_domain(cases)
+    m, lat, domain_results = run_domain(cases)
     rows.append(("domain", m, lat))
+    head_to_head(cases, flat_results, domain_results)
     summary(rows)

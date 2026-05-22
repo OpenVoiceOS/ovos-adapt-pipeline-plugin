@@ -502,6 +502,57 @@ TEST_CASES = [
      "stop"),              # StopCancelKeyword matches "never mind"; cancel alone fires stop
     ("pause the music and turn down the volume",
      "set_volume"),        # VolumeKeyword+DirectionKeyword outranks pause_music coverage
+
+    # ── entity-overlap cases ──────────────────────────────────────────────
+    # Each utterance contains a word registered under two or more entity
+    # types spanning two or more domains. The correct intent is decided by
+    # the *other* keywords present. These stress whether per-domain trie
+    # isolation changes the matched intent versus a shared trie.
+
+    # "turn up" / "turn down" / "crank up" — VolumeKeyword (media)
+    #                                        ∩ Heat/CoolKeyword (climate)
+    ("turn up the music a bit",             "set_volume"),
+    ("turn up the volume now",              "set_volume"),
+    ("crank up the tunes",                  "set_volume"),
+    ("turn down the music",                 "set_volume"),
+    ("turn down the volume a little",       "set_volume"),
+    ("ease off the volume",                 "set_volume"),
+    ("turn up the heating",                 "thermostat_set"),
+    ("crank up the heating please",         "thermostat_set"),
+    ("turn down the heating",               "thermostat_set"),
+    ("turn down the thermostat",            "thermostat_set"),
+    ("turn up the heat in here",            "thermostat_set"),
+
+    # "temperature" / "hot" / "cold" / "warm" — WeatherKeyword (weather)
+    #                          ∩ Thermostat/Heat/CoolKeyword (climate)
+    ("what's the temperature outside",      "weather_query"),
+    ("is it hot out today",                 "weather_query"),
+    ("is it cold out",                      "weather_query"),
+    ("is it warm out there",                "weather_query"),
+    ("set the thermostat temperature",      "thermostat_set"),
+    ("check the thermostat",                "thermostat_set"),
+    ("lower the thermostat",                "thermostat_set"),
+    ("drop it a couple of degrees",         "thermostat_set"),
+    ("bump it up a few degrees",            "thermostat_set"),
+
+    # "stop" / "pause" / "halt" / "cancel" — StopKeyword (media)
+    #                  ∩ Cancel/StopCancelKeyword (timers / system)
+    ("stop the music",                      "pause_music"),
+    ("pause the track",                     "pause_music"),
+    ("halt the song",                       "pause_music"),
+    ("cancel the timer right now",          "cancel_timer"),
+    ("stop the countdown",                  "cancel_timer"),
+    ("delete the timer",                    "cancel_timer"),
+    ("abort the whole thing",               "stop"),
+    ("never mind cancel it",                "stop"),
+
+    # "kill" — CancelKeyword (timers) ∩ OffKeyword (lights)
+    ("kill the timer",                      "cancel_timer"),
+    ("kill the bedroom lights",             "lights_off"),
+
+    # "start" / "make" — SetKeyword (timers)
+    ("start a timer for me",                "set_timer"),
+    ("make a quick timer",                  "set_timer"),
 ]
 
 # ── no-match utterances ────────────────────────────────────────────────────
@@ -580,6 +631,21 @@ NO_MATCH_UTTERANCES = [
     "they said the music was too loud at the party", # 'music' — reported complaint
     "my mum always sets three alarms just in case", # 'alarms' — describing habit
     "the kids wanted to play something different",  # 'play' — not a media command
+
+    # ── entity-overlap no-match: overlapping keyword present, not a command ──
+    "did anything turn up at the office",          # 'turn up' ∈ Volume/Heat
+    "i had to turn down the invitation",           # 'turn down' ∈ Volume/Cool
+    "the music just would not stop",               # 'stop'+'music' — narrative
+    "it was stone cold by then",                   # 'cold' ∈ Weather/Cool — idiom
+    "the hot topic was politics all evening",      # 'hot' ∈ Weather/Heat
+    "they cancel each other out",                  # 'cancel' — idiom
+    "he was dead set against the idea",            # 'set' ∈ SetKeyword — idiom
+    "the heating engineer came round today",       # 'heating' ∈ Thermostat
+    "kill the engine before you park",             # 'kill' ∈ Cancel/Off
+    "her degrees were framed on the wall",         # 'degrees' ∈ Thermostat
+    "i need to cool off after that argument",      # 'cool' ∈ Thermostat/Cool
+    "the temperature of the debate rose",          # 'temperature' ∈ Weather/Thermostat
+    "give the new hire a warm welcome",            # 'warm' ∈ Weather/Heat
 
     # ── nonsense ──────────────────────────────────────────────────────────────
     "blarg wump fizz",
