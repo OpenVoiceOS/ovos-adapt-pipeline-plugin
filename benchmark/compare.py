@@ -56,6 +56,10 @@ def _entity_types(intent_names):
     return etypes
 
 
+#: intent_name -> its domain
+INTENT_DOMAIN = {i: d for d, names in DOMAINS.items() for i in names}
+
+
 def _best_name(intents):
     """Global argmax intent label over a list of Adapt parse dicts."""
     if not intents:
@@ -171,6 +175,58 @@ def run_domain(cases):
 
 # ── summary table ──────────────────────────────────────────────────────────
 
+def run_hierarchical(cases):
+    """Two-stage routing: classify the domain, then resolve within it.
+
+    Stage 1 is a domain classifier — a flat engine whose 'intents' are
+    domains, each requiring a pooled keyword entity covering every word
+    used by that domain's intents. Stage 2 runs only the winning domain's
+    sub-engine. A wrong stage-1 route cannot be recovered.
+    """
+    sub = {}
+    for domain, intent_names in DOMAINS.items():
+        engine = IntentDeterminationEngine()
+        for etype in _entity_types(intent_names):
+            for value in VOCAB.get(etype, []):
+                engine.register_entity(value, etype)
+        for intent_name in intent_names:
+            engine.register_intent_parser(_build_parser(intent_name))
+        sub[domain] = engine
+
+    classifier = IntentDeterminationEngine()
+    for domain, intent_names in DOMAINS.items():
+        pooled = set()
+        for etype in _entity_types(intent_names):
+            pooled.update(VOCAB.get(etype, []))
+        for value in pooled:
+            classifier.register_entity(value, f"{domain}_kw")
+        classifier.register_intent_parser(
+            IntentBuilder(domain).require(f"{domain}_kw").build())
+
+    results, latencies = [], []
+    routed_ok = routed_total = 0
+    for utt, expected in cases:
+        t0 = time.perf_counter()
+        domain, _ = _best_name(list(classifier.determine_intent(utt, 100)))
+        if domain in sub:
+            name, conf = _best_name(list(sub[domain].determine_intent(utt, 100)))
+        else:
+            name, conf = None, 0.0
+        latencies.append((time.perf_counter() - t0) * 1000)
+        results.append((name, conf))
+        if expected is not None:
+            routed_total += 1
+            if domain == INTENT_DOMAIN.get(expected):
+                routed_ok += 1
+
+    m = compute_metrics(results, cases)
+    print_report("hierarchical  —  two-stage (classify domain, then intent)",
+                 m, latencies)
+    print(f"  Stage-1 routing : {routed_ok}/{routed_total} match cases "
+          f"routed to the correct domain ({routed_ok / routed_total:.0%})")
+    return m, statistics.median(latencies), results
+
+
 def head_to_head(cases, flat_results, domain_results):
     """Report the cases where flat and domain predict a different intent."""
     diffs = []
@@ -224,5 +280,7 @@ if __name__ == "__main__":
     rows.append(("flat", m, lat))
     m, lat, domain_results = run_domain(cases)
     rows.append(("domain", m, lat))
+    m, lat, _ = run_hierarchical(cases)
+    rows.append(("hierarchical", m, lat))
     head_to_head(cases, flat_results, domain_results)
     summary(rows)

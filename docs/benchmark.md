@@ -1,13 +1,17 @@
 # Benchmark
 
-`benchmark/compare.py` measures intent-matching accuracy and speed of the
-two Adapt engine topologies on one shared keyword dataset:
+`benchmark/compare.py` measures intent-matching accuracy and speed of three
+Adapt engine topologies on one shared keyword dataset:
 
 - **flat** — a single `IntentDeterminationEngine`. Every intent parser and
   every entity share one `Trie` and one entity tagger.
 - **domain** — a `DomainIntentDeterminationEngine`. Intents are grouped into
   domains; each domain owns an isolated sub-engine with its own `Trie` and
   tagger. Every domain is scored and the global argmax wins.
+- **hierarchical** — true two-stage routing. A stage-1 domain classifier (a
+  flat engine whose 'intents' are domains, each requiring a pooled keyword
+  entity covering every word the domain uses) picks one domain; stage 2 runs
+  only that domain's sub-engine. A wrong stage-1 route cannot be recovered.
 
 ## Dataset
 
@@ -41,18 +45,21 @@ false-positive rate.
 - **TN / FP** — true negatives and false positives over the no-match cases.
 - **Head-to-head** — the cases where flat and domain predict a *different*
   intent. This isolates the effect of trie isolation from the dataset.
+- **Stage-1 routing** — for the hierarchical engine, the share of match cases
+  whose stage-1 classifier picked the domain that owns the correct intent.
 - **Latency** — per-query wall time.
 
 ## Results
 
-Single run, both engines on the same machine and dataset:
+Single run, all engines on the same machine and dataset:
 
 | Engine | Accuracy | Precision | Recall | F1 | TN/NM | FP | FN | Median lat |
 |---|---|---|---|---|---|---|---|---|
-| flat   | 79.3% | 79.6% | 91.2% | 0.850 | 34/80 | 58 | 22 | 0.28 ms |
-| domain | 79.3% | 79.6% | 91.2% | 0.850 | 34/80 | 58 | 22 | 0.85 ms |
+| flat         | 79.3% | 79.6% | 91.2% | 0.850 | 34/80 | 58 | 22 | 0.23 ms |
+| domain       | 79.3% | 79.6% | 91.2% | 0.850 | 34/80 | 58 | 22 | 0.94 ms |
+| hierarchical | 74.5% | 80.2% | 81.5% | 0.809 | 42/80 | 50 | 46 | 0.38 ms |
 
-Head-to-head:
+Flat vs domain head-to-head:
 
 ```text
 Cases             : 329
@@ -60,8 +67,11 @@ Same prediction   : 318
 Different         :  11   (3.3%)
 ```
 
-Of the 11 cases where the engines diverge: domain is correct on 4, flat is
+Of the 11 cases where flat and domain diverge: domain is correct on 4, flat is
 correct on 4, and both are wrong on 3 (a different false positive each).
+
+Hierarchical stage-1 routing: **211 / 249 match cases (85%)** are routed to the
+correct domain. The other 15% are misrouted and cannot be recovered by stage 2.
 
 ## Interpreting the results
 
@@ -88,9 +98,29 @@ the per-intent confidences and can flip the global argmax. Examples:
 The flip is a side effect of which entities happen to be visible, not a
 smarter decision — which is why the wins and losses come out even.
 
-**Domain routing costs latency.** The domain engine evaluates every domain's
-sub-engine per query, so median latency rises from ~0.3 ms to ~0.85 ms. Both
-remain far below any perceptible threshold.
+**Two-stage routing is worse, not better.** The hierarchical engine scores
+74.5% — five points below flat — because hard stage-1 routing is lossy.
+Stage 1 misroutes 15% of match cases, and a misrouted utterance is
+unrecoverable: stage 2 only ever sees one domain. Recall drops from 91.2% to
+81.5% as a direct result.
+
+This is structural, not a tuning problem. Flat global-argmax already considers
+every intent, so it is an *upper bound* that hard two-stage routing cannot
+exceed — two-stage only ever removes candidates. The misroutes are caused by
+the same shared vocabulary the overlap cases stress: `cancel the timer` routes
+to *media* because `cancel` is a `StopKeyword` there, never reaching the
+*timers* domain that owns `cancel_timer`.
+
+Hierarchical does buy a little precision: the stage-1 gate rejects 8 more
+no-match utterances (TN 34 → 42, FP 58 → 50), lifting precision to 80.2%. But
+the recall it sacrifices to get there costs far more accuracy than the
+precision it gains. It is also faster than the parallel domain engine
+(~0.38 ms vs ~0.94 ms) because stage 2 evaluates only one sub-engine — but
+speed was never the bottleneck.
+
+**Domain routing costs latency.** The parallel domain engine evaluates every
+domain's sub-engine per query, so median latency rises from ~0.2 ms to
+~0.9 ms. Both remain far below any perceptible threshold.
 
 **False positives are inherent to keyword matching.** 46 of the 80 no-match
 utterances trigger a parse under both engines because they contain a required
