@@ -15,9 +15,11 @@ keyword dataset:
 - **domain** — a `DomainIntentDeterminationEngine`. Intents are grouped into
   domains; each domain owns an isolated sub-engine with its own `Trie` and
   tagger. Every domain is scored and the global argmax wins.
-- **hierarchical** — true two-stage routing. A stage-1 keyword-coverage
-  classifier picks one domain; stage 2 runs only that domain's sub-engine.
-  A wrong stage-1 route cannot be recovered.
+- **hierarchical** — a `HierarchicalIntentDeterminationEngine` (a subclass of
+  `DomainIntentDeterminationEngine` with the same registration API). Its
+  `determine_intent` runs a stage-1 keyword-coverage classifier to pick one
+  domain, then evaluates only that domain's sub-engine. A wrong stage-1 route
+  cannot be recovered.
 
 ## How the topologies can differ
 

@@ -30,7 +30,9 @@ from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_workshop.intents import open_intent_envelope
 
-from ovos_adapt.engine import IntentDeterminationEngine, DomainIntentDeterminationEngine
+from ovos_adapt.engine import (IntentDeterminationEngine,
+                                DomainIntentDeterminationEngine,
+                                HierarchicalIntentDeterminationEngine)
 
 
 def _entity_skill_id(skill_id):
@@ -421,13 +423,18 @@ class DomainAdaptPipeline(AdaptPipeline):
     ``skill_id`` prefix of the intent label (``skill_id:intent_name``).
     """
 
+    #: per-domain engine class; overridden by HierarchicalAdaptPipeline.
+    _engine_class = DomainIntentDeterminationEngine
+    #: config section under ``intents``; overridden by subclasses.
+    _config_key = "ovos_adapt_domain_pipeline"
+
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None):
         core_config = Configuration()
         # Use dedicated config section so users can tune this pipeline
         # independently from the flat AdaptPipeline.
         config = config or core_config.get("intents", {}).get(
-            "ovos_adapt_domain_pipeline", {})
+            self._config_key, {})
         # Skip AdaptPipeline.__init__ to avoid building a flat engine; call
         # the grandparent initializer directly.
         ConfidenceMatcherPipeline.__init__(self, bus, config)
@@ -436,7 +443,7 @@ class DomainAdaptPipeline(AdaptPipeline):
         if self.lang not in langs:
             langs.append(self.lang)
         langs = [standardize_lang_tag(l) for l in langs]
-        self.engines = {lang: DomainIntentDeterminationEngine()
+        self.engines = {lang: self._engine_class()
                         for lang in langs}
 
         self.lock = Lock()
@@ -483,6 +490,20 @@ class DomainAdaptPipeline(AdaptPipeline):
             return index[best]
         return entity_type
 
+    def _gather_candidates(self, engine, utt, sess):
+        """Collect intent candidates for an utterance.
+
+        Scores every domain sub-engine in parallel. Overridden by
+        :class:`HierarchicalAdaptPipeline` to score a single routed domain.
+        """
+        candidates = []
+        for sub in engine.domains.values():
+            for it in sub.determine_intent(
+                    utterance=utt, num_results=1, include_tags=True,
+                    context_manager=sess.context):
+                candidates.append(it)
+        return candidates
+
     @lru_cache(maxsize=3)
     def match_intent(self, utterances: Iterable[str],
                      lang: Optional[str] = None,
@@ -523,13 +544,7 @@ class DomainAdaptPipeline(AdaptPipeline):
         engine = self.engines[lang]
         for utt in utterances:
             try:
-                candidates = []
-                for sub in engine.domains.values():
-                    for it in sub.determine_intent(
-                            utterance=utt, num_results=1,
-                            include_tags=True,
-                            context_manager=sess.context):
-                        candidates.append(it)
+                candidates = self._gather_candidates(engine, utt, sess)
                 if candidates:
                     utt_best = max(candidates,
                                    key=lambda x: x.get('confidence', 0.0))
@@ -608,3 +623,23 @@ class DomainAdaptPipeline(AdaptPipeline):
         for sub in self.engines[lang].domains.values():
             out.extend(parser.__dict__ for parser in sub.intent_parsers)
         return out
+
+
+class HierarchicalAdaptPipeline(DomainAdaptPipeline):
+    """Adapt pipeline backed by ``HierarchicalIntentDeterminationEngine``.
+
+    Shares the per-skill domain model and registration routing of
+    :class:`DomainAdaptPipeline`. Unlike that pipeline, which scores every
+    domain in parallel, this variant classifies the domain first and
+    evaluates only that domain's sub-engine. A misclassified domain cannot
+    be recovered.
+    """
+
+    _engine_class = HierarchicalIntentDeterminationEngine
+    _config_key = "ovos_adapt_hierarchical_pipeline"
+
+    def _gather_candidates(self, engine, utt, sess):
+        """Collect intent candidates from the single routed domain."""
+        return list(engine.determine_intent(
+            utterance=utt, num_results=1, include_tags=True,
+            context_manager=sess.context))

@@ -535,3 +535,80 @@ class DomainIntentDeterminationEngine(object):
         """
         return self.domains[domain].drop_regex_entity(entity_type=entity_type,
                                                       match_func=match_func)
+
+
+class HierarchicalIntentDeterminationEngine(DomainIntentDeterminationEngine):
+    """Two-stage domain engine: classify the domain, then resolve the intent.
+
+    Shares the registration API of :class:`DomainIntentDeterminationEngine`.
+    Where that engine scores every domain in parallel and takes the global
+    argmax, :meth:`determine_intent` here first picks a single domain with a
+    keyword-coverage classifier and evaluates only that domain's sub-engine.
+    A misclassified domain cannot be recovered.
+    """
+
+    def __init__(self):
+        super().__init__()
+        #: domain -> set of registered entity surface forms, scored by the
+        #: stage-1 classifier.
+        self._domain_vocabulary = {}
+
+    def register_entity(self, entity_value, entity_type, alias_of=None,
+                        domain=0):
+        """Register an entity and record its surface form for the classifier."""
+        super().register_entity(entity_value, entity_type,
+                                alias_of=alias_of, domain=domain)
+        self._domain_vocabulary.setdefault(domain, set()).add(
+            entity_value.lower())
+
+    def classify_domain(self, utterance):
+        """Return the domain whose vocabulary best covers the utterance.
+
+        Scores each domain by the number of utterance characters covered by
+        its registered entity values, word-boundary matched.
+
+        Args:
+            utterance(str): the utterance to classify.
+
+        Returns:
+            The best-matching domain, or ``None`` when no domain keyword is
+            present.
+        """
+        text = utterance.lower()
+        best_domain = None
+        best_score = 0
+        for domain, vocabulary in self._domain_vocabulary.items():
+            if domain not in self.domains:
+                continue
+            covered = bytearray(len(text))
+            for keyword in vocabulary:
+                for match in re.finditer(
+                        r"\b" + re.escape(keyword) + r"\b", text):
+                    for i in range(match.start(), match.end()):
+                        covered[i] = 1
+            score = sum(covered)
+            if score > best_score:
+                best_score = score
+                best_domain = domain
+        return best_domain
+
+    def determine_intent(self, utterance, num_results=1, include_tags=False,
+                         context_manager=None):
+        """Classify the domain, then yield intents from that domain only.
+
+        Args:
+            utterance(str): an ascii or unicode string representing natural
+                language speech.
+            num_results(int): a maximum number of results to be returned.
+            include_tags(bool): include the parsed tags as part of result.
+            context_manager(list): a context manager to provide context.
+
+        Returns: A generator that yields dictionaries.
+        """
+        domain = self.classify_domain(utterance)
+        if domain is None or domain not in self.domains:
+            return
+        for intent in self.domains[domain].determine_intent(
+                utterance=utterance, num_results=num_results,
+                include_tags=include_tags, context_manager=context_manager):
+            yield intent

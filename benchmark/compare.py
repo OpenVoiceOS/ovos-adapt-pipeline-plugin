@@ -1,21 +1,25 @@
 """
-Comparative accuracy + speed benchmark: flat Adapt vs domain Adapt.
+Engine-comparison harness: flat vs domain vs hierarchical Adapt.
 
-Both runners use the same keyword vocabulary and intent definitions. The
-only difference is engine topology:
+All three runners use the same keyword vocabulary and intent definitions.
+The only difference is engine topology:
 
-- **flat**   — one :class:`IntentDeterminationEngine`; every intent parser
-  and every entity share a single Trie and tagger.
-- **domain** — one :class:`DomainIntentDeterminationEngine`; intents are
-  grouped into domains, each domain owning an isolated sub-engine (its own
-  Trie + tagger). At match time every domain is scored and the global
-  argmax wins.
+- **flat**         — one :class:`IntentDeterminationEngine`; every intent
+  parser and every entity share a single Trie and tagger.
+- **domain**       — one :class:`DomainIntentDeterminationEngine`; intents are
+  grouped into domains, each domain owning an isolated sub-engine. Every
+  domain is scored and the global argmax wins.
+- **hierarchical** — one :class:`HierarchicalIntentDeterminationEngine`; a
+  stage-1 classifier picks one domain, then only that domain's sub-engine is
+  scored.
+
+This is a hand-tuned reference corpus, not a representative benchmark — see
+docs/benchmark.md.
 
 Usage
 -----
     python benchmark/compare.py
 """
-import re
 import statistics
 import sys
 import time
@@ -29,6 +33,7 @@ from benchmark.dataset import (  # noqa: E402
 )
 from ovos_adapt.engine import (  # noqa: E402
     IntentDeterminationEngine, DomainIntentDeterminationEngine,
+    HierarchicalIntentDeterminationEngine,
 )
 from ovos_adapt.intent import IntentBuilder  # noqa: E402
 
@@ -176,74 +181,36 @@ def run_domain(cases):
 
 # ── summary table ──────────────────────────────────────────────────────────
 
-def _make_domain_classifier():
-    """Stage-1 classifier: route an utterance to its most likely domain.
-
-    Scores each domain by how many utterance characters are covered by that
-    domain's pooled keyword vocabulary (word-boundary matched) and returns
-    the argmax. Returns ``None`` when no domain keyword is present.
-    """
-    pools = {}
-    for domain, intent_names in DOMAINS.items():
-        kws = set()
-        for etype in _entity_types(intent_names):
-            kws.update(VOCAB.get(etype, []))
-        pools[domain] = [re.compile(r"\b" + re.escape(kw) + r"\b")
-                         for kw in kws]
-
-    def classify(utt):
-        u = utt.lower()
-        best_domain, best_score = None, 0
-        for domain, patterns in pools.items():
-            covered = bytearray(len(u))
-            for pat in patterns:
-                for m in pat.finditer(u):
-                    for j in range(m.start(), m.end()):
-                        covered[j] = 1
-            score = sum(covered)
-            if score > best_score:
-                best_score, best_domain = score, domain
-        return best_domain
-
-    return classify
-
-
 def run_hierarchical(cases):
-    """Two-stage routing: classify the domain, then resolve within it.
+    """Two-stage routing via HierarchicalIntentDeterminationEngine.
 
-    Stage 1 is a keyword-coverage domain classifier. Stage 2 runs only the
-    winning domain's sub-engine. A wrong stage-1 route cannot be recovered.
+    Registers the same per-domain intents as the parallel domain engine.
+    ``determine_intent`` classifies the domain and resolves only within it;
+    a wrong stage-1 route cannot be recovered.
     """
-    sub = {}
+    engine = HierarchicalIntentDeterminationEngine()
     for domain, intent_names in DOMAINS.items():
-        engine = IntentDeterminationEngine()
         for etype in _entity_types(intent_names):
             for value in VOCAB.get(etype, []):
-                engine.register_entity(value, etype)
+                engine.register_entity(value, etype, domain=domain)
         for intent_name in intent_names:
-            engine.register_intent_parser(_build_parser(intent_name))
-        sub[domain] = engine
-
-    classify = _make_domain_classifier()
+            engine.register_intent_parser(_build_parser(intent_name),
+                                          domain=domain)
 
     results, latencies = [], []
     routed_ok = routed_total = 0
     for utt, expected in cases:
         t0 = time.perf_counter()
-        domain = classify(utt)
-        if domain in sub:
-            name, conf = _best_name(list(sub[domain].determine_intent(utt, 100)))
-        else:
-            name, conf = None, 0.0
+        intents = list(engine.determine_intent(utt, 100))
         latencies.append((time.perf_counter() - t0) * 1000)
-        results.append((name, conf))
+        results.append(_best_name(intents))
         if expected is not None:
             routed_total += 1
-            if domain == INTENT_DOMAIN.get(expected):
+            if engine.classify_domain(utt) == INTENT_DOMAIN.get(expected):
                 routed_ok += 1
 
     m = compute_metrics(results, cases)
-    print_report("hierarchical  —  two-stage (classify domain, then intent)",
+    print_report("hierarchical  —  HierarchicalIntentDeterminationEngine",
                  m, latencies)
     print(f"  Stage-1 routing : {routed_ok}/{routed_total} match cases "
           f"routed to the correct domain ({routed_ok / routed_total:.0%})")
