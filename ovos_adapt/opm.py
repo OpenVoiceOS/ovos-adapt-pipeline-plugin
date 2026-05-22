@@ -496,8 +496,10 @@ class DomainAdaptPipeline(AdaptPipeline):
         Scores every domain sub-engine in parallel. Overridden by
         :class:`HierarchicalAdaptPipeline` to score a single routed domain.
         """
+        with self.lock:
+            sub_engines = list(engine.domains.values())
         candidates = []
-        for sub in engine.domains.values():
+        for sub in sub_engines:
             for it in sub.determine_intent(
                     utterance=utt, num_results=1, include_tags=True,
                     context_manager=sess.context):
@@ -581,8 +583,7 @@ class DomainAdaptPipeline(AdaptPipeline):
         lang = standardize_lang_tag(lang)
         if lang in self.engines:
             with self.lock:
-                domain = self._resolve_entity_domain(
-                    lang, entity_type if not regex_str else regex_str)
+                domain = self._resolve_entity_domain(lang, entity_type)
                 if regex_str:
                     self.engines[lang].register_regex_entity(
                         regex_str, domain=domain)
@@ -605,16 +606,18 @@ class DomainAdaptPipeline(AdaptPipeline):
     def detach_intent(self, intent_name):
         """Detach a single intent from its owning domain."""
         domain = _domain_from_intent_name(intent_name)
-        for lang in self.engines:
-            engine = self.engines[lang]
-            if domain in engine.domains:
-                sub = engine.domains[domain]
-                sub.intent_parsers = [p for p in sub.intent_parsers
-                                      if p.name != intent_name]
+        with self.lock:
+            for lang in self.engines:
+                engine = self.engines[lang]
+                if domain in engine.domains:
+                    sub = engine.domains[domain]
+                    sub.intent_parsers = [p for p in sub.intent_parsers
+                                          if p.name != intent_name]
 
     def shutdown(self):
-        for lang in self.engines:
-            self.engines[lang].domains = {}
+        with self.lock:
+            for lang in self.engines:
+                self.engines[lang].domains = {}
 
     @property
     def registered_intents(self):
@@ -640,6 +643,7 @@ class HierarchicalAdaptPipeline(DomainAdaptPipeline):
 
     def _gather_candidates(self, engine, utt, sess):
         """Collect intent candidates from the single routed domain."""
-        return list(engine.determine_intent(
-            utterance=utt, num_results=1, include_tags=True,
-            context_manager=sess.context))
+        with self.lock:
+            return list(engine.determine_intent(
+                utterance=utt, num_results=1, include_tags=True,
+                context_manager=sess.context))

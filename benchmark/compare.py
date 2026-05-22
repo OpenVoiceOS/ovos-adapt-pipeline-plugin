@@ -63,7 +63,14 @@ def _entity_types(intent_names):
 
 
 #: intent_name -> its domain
-INTENT_DOMAIN = {i: d for d, names in DOMAINS.items() for i in names}
+INTENT_DOMAIN = {}
+for _domain, _names in DOMAINS.items():
+    for _intent in _names:
+        if _intent in INTENT_DOMAIN:
+            raise ValueError(
+                f"Intent '{_intent}' assigned to multiple domains: "
+                f"{INTENT_DOMAIN[_intent]} and {_domain}")
+        INTENT_DOMAIN[_intent] = _domain
 
 
 def _best_name(intents):
@@ -212,8 +219,9 @@ def run_hierarchical(cases):
     m = compute_metrics(results, cases)
     print_report("hierarchical  —  HierarchicalIntentDeterminationEngine",
                  m, latencies)
+    routed_pct = f"{routed_ok / routed_total:.0%}" if routed_total else "n/a"
     print(f"  Stage-1 routing : {routed_ok}/{routed_total} match cases "
-          f"routed to the correct domain ({routed_ok / routed_total:.0%})")
+          f"routed to the correct domain ({routed_pct})")
     return m, statistics.median(latencies), results
 
 
