@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.0a1) (2026-05-22)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.2.0a2...1.3.0a1)
+
+**Merged pull requests:**
+
+- feat: HierarchicalIntentDeterminationEngine  [\#37](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/37) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.2.0a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.2.0a2) (2026-05-22)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.2.0a1...1.2.0a2)
