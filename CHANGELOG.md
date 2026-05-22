@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.2.0a2) (2026-05-22)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.2.0a1...1.2.0a2)
+
+**Merged pull requests:**
+
+- docs: zero-to-hero documentation guide [\#39](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/39) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.2.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.2.0a1) (2026-05-21)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.1.0a1...1.2.0a1)
