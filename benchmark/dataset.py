@@ -1,9 +1,13 @@
 """
-Keyword-intent benchmark dataset for the Adapt engine.
+Engine-comparison reference corpus for the Adapt engine.
 
-Used to compare three engine topologies on identical vocabulary and intents:
-the flat ``IntentDeterminationEngine``, the parallel
-``DomainIntentDeterminationEngine``, and a two-stage hierarchical router.
+This is NOT a benchmark. It is a small, hand-tuned dataset built to expose
+behavioural differences between three engine topologies — the flat
+``IntentDeterminationEngine``, the parallel ``DomainIntentDeterminationEngine``,
+and a two-stage hierarchical router. It is not a representative sample of real
+traffic; its accuracy numbers are an artifact of how the discriminating
+sections are mixed and can be skewed to favour any topology. See
+``docs/benchmark.md`` ("Reading the numbers").
 
 Design
 ------
