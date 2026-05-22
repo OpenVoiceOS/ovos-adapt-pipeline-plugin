@@ -6,6 +6,17 @@ The Adapt Intent Parser is a flexible and extensible intent definition and deter
 
 This repository contains a OVOS pipeline plugin and bundles a fork of the original [adapt-parser](https://github.com/MycroftAI/adapt) from the defunct MycroftAI
 
+Documentation
+=============
+A zero-to-hero guide lives in [`docs/`](docs/index.md):
+
+- [Concepts](docs/concepts.md) — entities, intents, cliques, and confidence
+- [Quickstart](docs/quickstart.md) — install, enable, match your first utterance
+- [Writing intents](docs/writing-intents.md) — the `IntentBuilder` API with examples
+- [Configuration](docs/configuration.md) — confidence tiers and every config key
+- [Bus protocol](docs/bus-protocol.md) — the messagebus API skills register over
+- [Internals](docs/internals.md) — tagging, clique expansion, the confidence math
+
 Examples
 ========
 Executable examples can be found in the [examples folder](https://github.com/MycroftAI/adapt/tree/master/examples).
