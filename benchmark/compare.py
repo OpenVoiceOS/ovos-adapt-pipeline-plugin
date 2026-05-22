@@ -15,6 +15,7 @@ Usage
 -----
     python benchmark/compare.py
 """
+import re
 import statistics
 import sys
 import time
@@ -175,13 +176,43 @@ def run_domain(cases):
 
 # ── summary table ──────────────────────────────────────────────────────────
 
+def _make_domain_classifier():
+    """Stage-1 classifier: route an utterance to its most likely domain.
+
+    Scores each domain by how many utterance characters are covered by that
+    domain's pooled keyword vocabulary (word-boundary matched) and returns
+    the argmax. Returns ``None`` when no domain keyword is present.
+    """
+    pools = {}
+    for domain, intent_names in DOMAINS.items():
+        kws = set()
+        for etype in _entity_types(intent_names):
+            kws.update(VOCAB.get(etype, []))
+        pools[domain] = [re.compile(r"\b" + re.escape(kw) + r"\b")
+                         for kw in kws]
+
+    def classify(utt):
+        u = utt.lower()
+        best_domain, best_score = None, 0
+        for domain, patterns in pools.items():
+            covered = bytearray(len(u))
+            for pat in patterns:
+                for m in pat.finditer(u):
+                    for j in range(m.start(), m.end()):
+                        covered[j] = 1
+            score = sum(covered)
+            if score > best_score:
+                best_score, best_domain = score, domain
+        return best_domain
+
+    return classify
+
+
 def run_hierarchical(cases):
     """Two-stage routing: classify the domain, then resolve within it.
 
-    Stage 1 is a domain classifier — a flat engine whose 'intents' are
-    domains, each requiring a pooled keyword entity covering every word
-    used by that domain's intents. Stage 2 runs only the winning domain's
-    sub-engine. A wrong stage-1 route cannot be recovered.
+    Stage 1 is a keyword-coverage domain classifier. Stage 2 runs only the
+    winning domain's sub-engine. A wrong stage-1 route cannot be recovered.
     """
     sub = {}
     for domain, intent_names in DOMAINS.items():
@@ -193,21 +224,13 @@ def run_hierarchical(cases):
             engine.register_intent_parser(_build_parser(intent_name))
         sub[domain] = engine
 
-    classifier = IntentDeterminationEngine()
-    for domain, intent_names in DOMAINS.items():
-        pooled = set()
-        for etype in _entity_types(intent_names):
-            pooled.update(VOCAB.get(etype, []))
-        for value in pooled:
-            classifier.register_entity(value, f"{domain}_kw")
-        classifier.register_intent_parser(
-            IntentBuilder(domain).require(f"{domain}_kw").build())
+    classify = _make_domain_classifier()
 
     results, latencies = [], []
     routed_ok = routed_total = 0
     for utt, expected in cases:
         t0 = time.perf_counter()
-        domain, _ = _best_name(list(classifier.determine_intent(utt, 100)))
+        domain = classify(utt)
         if domain in sub:
             name, conf = _best_name(list(sub[domain].determine_intent(utt, 100)))
         else:
