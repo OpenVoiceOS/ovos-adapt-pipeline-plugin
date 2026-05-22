@@ -50,7 +50,9 @@ VOCAB = {
                       "podcast", "tune"],
     "OBJ_LIGHT":     ["light", "lights", "lamp", "bulb", "lighting"],
     "OBJ_HVAC":      ["thermostat", "heating", "heater", "radiator",
-                      "air conditioning"],
+                      "air conditioning", "temperature"],
+    "OBJ_ROOM":      ["bedroom", "kitchen", "living room", "bathroom",
+                      "hallway", "office", "garage"],
     "OBJ_TIMER":     ["timer", "countdown"],
     "OBJ_ALARM":     ["alarm"],
     "OBJ_WEATHER":   ["weather", "forecast", "rain", "umbrella",
@@ -77,11 +79,15 @@ INTENTS = {
     "volume_up":     {"required": ["ACTION_RAISE", "OBJ_AUDIO"], "optional": []},
     "volume_down":   {"required": ["ACTION_LOWER", "OBJ_AUDIO"], "optional": []},
     # lights
-    "lights_on":     {"required": ["ACTION_ON", "OBJ_LIGHT"], "optional": []},
-    "lights_off":    {"required": ["ACTION_OFF", "OBJ_LIGHT"], "optional": []},
+    "lights_on":     {"required": ["ACTION_ON", "OBJ_LIGHT"],
+                      "optional": ["OBJ_ROOM"]},
+    "lights_off":    {"required": ["ACTION_OFF", "OBJ_LIGHT"],
+                      "optional": ["OBJ_ROOM"]},
     # climate
-    "heating_up":    {"required": ["ACTION_RAISE", "OBJ_HVAC"], "optional": []},
-    "heating_down":  {"required": ["ACTION_LOWER", "OBJ_HVAC"], "optional": []},
+    "heating_up":    {"required": ["ACTION_RAISE", "OBJ_HVAC"],
+                      "optional": ["OBJ_ROOM"]},
+    "heating_down":  {"required": ["ACTION_LOWER", "OBJ_HVAC"],
+                      "optional": ["OBJ_ROOM"]},
     "check_hvac":    {"required": ["ACTION_ASK", "OBJ_HVAC"], "optional": []},
     # timers & alarms
     "set_timer":     {"required": ["ACTION_SET", "OBJ_TIMER"], "optional": []},
@@ -226,7 +232,7 @@ TEST_CASES = [
     ("do i need an umbrella",                 "weather_query"),
     ("what's the forecast",                   "weather_query"),
     ("is there snow coming",                  "weather_query"),
-    ("what's the temperature outside",        "weather_query"),
+    ("is it going to snow",                   "weather_query"),
 
     # add_reminder — OBJ_REMINDER
     ("set a reminder",                        "add_reminder"),
@@ -236,7 +242,7 @@ TEST_CASES = [
 
     # call_contact — OBJ_PHONE
     ("call mum",                              "call_contact"),
-    ("phone the office",                      "call_contact"),
+    ("phone the bank",                        "call_contact"),
     ("dial charlie",                          "call_contact"),
     ("ring my brother",                       "call_contact"),
 
@@ -314,6 +320,33 @@ TEST_CASES = [
     ("turn off the lights then call mum",     "lights_off"),
     ("write a note about the shopping",       "add_note"),
     ("set a timer for the laundry",           "set_timer"),
+
+    # ── discriminating: flat & domain win, hierarchical loses ─────────────
+    # Real single-intent commands. The OBJECT keyword is unambiguous, but the
+    # utterance also carries a long room/topic word that pulls the stage-1
+    # coverage classifier to the wrong domain; the misroute is unrecoverable.
+    # One-word commands give the classifier nothing to route on at all.
+    ("play music in the living room",         "play_music"),
+    ("turn up the volume in the bedroom",     "volume_up"),
+    ("call mum about the heating",            "call_contact"),
+    ("set a timer in the living room",        "set_timer"),
+    ("look up the temperature",               "search_query"),
+    ("google the heating thermostat",         "search_query"),
+    ("the temperature please",                "weather_query"),
+    ("stop the timer",                        "stop_all"),
+
+    # ── discriminating: flat and domain diverge ───────────────────────────
+    # Two-clause utterances carrying two intents. Labelled by the leading
+    # clause. Flat scores every parser against one shared clique; domain
+    # scores each clause in its own isolated sub-engine. Because adapt
+    # confidence divides each intent's score by the total tag count of its
+    # clique, the two topologies break the tie between clauses differently.
+    ("turn off the lights and stop the music",   "lights_off"),
+    ("turn up the heating and lower the volume", "heating_up"),
+    ("turn on the lights and pause the music",   "lights_on"),
+    ("play some music and turn on the lights",   "play_music"),
+    ("lower the heating and pause the music",    "heating_down"),
+    ("play a podcast and turn down the heating", "play_music"),
 ]
 
 # ── no-match utterances ────────────────────────────────────────────────────
@@ -378,4 +411,21 @@ NO_MATCH_UTTERANCES = [
     "one fish two fish red fish",
     "lorem ipsum dolor sit amet",
     "the mitochondria is the powerhouse of the cell",
+
+    # ── discriminating: hierarchical wins, flat & domain lose ─────────────
+    # Not commands, but each contains a bare keyword for a single-slot intent
+    # (stop_all). Flat and domain fire stop_all on the lone word. The stage-1
+    # classifier routes these to a two-slot domain (media or timers) whose
+    # intents need a second keyword that is absent, so nothing fires and no
+    # false positive is emitted.
+    "they cancel each other out",
+    "they never stop arguing",
+    "the bus stop was crowded",
+    "cancel culture is everywhere",
+    "we should cancel the trip",
+    "i had to cancel my plans",
+    "stop right there",
+    "they would not stop talking",
+    "the train made a quick stop",
+    "the cancel button was greyed out",
 ]

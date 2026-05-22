@@ -12,38 +12,50 @@ Adapt engine topologies on one shared keyword dataset:
   classifier picks one domain; stage 2 runs only that domain's sub-engine.
   A wrong stage-1 route cannot be recovered.
 
+## How the topologies can differ
+
+Adapt scores a parse with
+`confidence = intent_confidence / len(clique_tags) × clique_confidence`,
+where `clique_tags` is *every* entity tagged in the matched clique — including
+entities from unrelated intents. So an intent's confidence is **diluted by the
+number of foreign tags** sharing its clique.
+
+- **flat** tags an utterance against every domain's vocabulary at once, so
+  cliques carry the most foreign tags and dilute the most.
+- **domain** tags each utterance against one domain's vocabulary at a time, so
+  cliques are smaller and the in-domain intent is diluted less.
+- **hierarchical** additionally discards every domain but one before scoring.
+
+On a clean single-intent utterance all three pick the same winner — there is
+no competitor for dilution to reorder. They diverge on utterances that carry
+more than one intent's keywords.
+
 ## Dataset
 
 `benchmark/dataset.py` defines the vocabulary, intents, domain grouping, and
 labelled utterances:
 
 ```text
-Cases   : 171  (125 match, 46 no-match)
+Cases   : 195  (139 match, 56 no-match)
 Intents : 26   across 11 domains
 ```
 
-Intents are mostly **two-slot** — an ACTION keyword plus an OBJECT keyword
-(`turn` + `up` + `the` + `volume`), so a single stray keyword cannot trigger
-an intent on its own. OBJECT vocabularies are domain-distinctive (`thermostat`
-only appears in *climate*, `playlist` only in *media*); ACTION vocabularies are
-deliberately shared across domains (`turn up` is both a volume and a heating
-action). A few intents are genuinely single-trigger (`weather_query`,
-`navigate_to`, `get_help`) and stay one-slot.
+Intents are mostly **two-slot** — a shared ACTION keyword plus a
+domain-distinctive OBJECT keyword — so a single stray keyword cannot trigger an
+intent. Beyond the everyday cases, the dataset carries three hand-crafted
+discriminating sections, each built to give one topology a clear edge:
 
-The 46 `NO_MATCH_UTTERANCES` are plausible but not commands, many containing a
-keyword used outside a command context (`"they cancel each other out"`).
-
-## Metrics
-
-- **Accuracy** — correct predictions over all cases (a no-match case is
-  correct when the engine returns nothing).
-- **Precision / Recall / F1** — over the match cases.
-- **TN / FP** — true negatives and false positives over the no-match cases.
-- **Head-to-head** — the cases where flat and domain predict a *different*
-  intent. This isolates the effect of trie isolation from the dataset.
-- **Stage-1 routing** — for the hierarchical engine, the share of match cases
-  whose stage-1 classifier picked the domain that owns the correct intent.
-- **Latency** — per-query wall time.
+- **flat & domain win, hierarchical loses** — real commands carrying a long
+  room/topic word (or a bare one-word command) that pulls the stage-1
+  classifier to the wrong domain. The misroute is unrecoverable.
+- **flat and domain diverge** — two-clause utterances carrying two intents,
+  labelled by the leading clause. Flat scores both clauses in one shared
+  clique; domain scores each clause in its own sub-engine. The dilution term
+  breaks the clause tie differently.
+- **hierarchical wins, flat & domain lose** — utterances that are not commands
+  but contain a bare keyword for a single-slot intent. Flat and domain fire on
+  the lone word; the classifier routes them to a two-slot domain where the
+  missing second keyword means nothing fires.
 
 ## Results
 
@@ -51,51 +63,43 @@ Single run, all engines on the same machine and dataset:
 
 | Engine | Accuracy | Precision | Recall | F1 | TN/NM | FP | FN | Median lat |
 |---|---|---|---|---|---|---|---|---|
-| flat         | 94.2% | 92.6% | 100.0% | 0.962 | 36/46 | 10 | 0 | 0.22 ms |
-| domain       | 94.2% | 92.6% | 100.0% | 0.962 | 36/46 | 10 | 0 | 0.82 ms |
-| hierarchical | 94.7% | 94.6% |  98.4% | 0.965 | 39/46 |  7 | 2 | 0.32 ms |
+| flat         | 87.2% | 84.3% | 96.4% | 0.899 | 36/56 | 25 |  5 | 0.21 ms |
+| domain       | 88.2% | 85.5% | 97.8% | 0.913 | 36/56 | 23 |  3 | 0.82 ms |
+| hierarchical | 90.3% | 93.4% | 91.4% | 0.924 | 49/56 |  9 | 12 | 0.32 ms |
 
-Flat vs domain head-to-head: **0 / 171 different** — identical predictions.
+Flat vs domain head-to-head: **6 / 195 different** — all six the two-clause
+utterances. Flat resolves the leading clause on 2 of them, domain on all 6.
 
-Hierarchical stage-1 routing: **123 / 125 match cases (98%)** routed to the
+Hierarchical stage-1 routing: **127 / 139 match cases (91%)** routed to the
 correct domain.
 
 ## Interpreting the results
 
-**Flat and domain are identical.** With two-slot intents and domain-distinctive
-object vocabularies, the two engines agree on every one of the 171 cases. A
-parser only fires when its own required entity types are tagged; a domain
-sub-engine's trie holds exactly those types, so isolation removes only tags no
-parser would have used. `DomainIntentDeterminationEngine` is a packaging and
-lifecycle convenience here, not an accuracy change.
+**Flat and domain are not equivalent.** They agree on every clean single-intent
+utterance — correctly, since dilution cannot reorder an uncontested winner —
+but diverge on the two-clause cases. There, flat scores both clauses inside one
+clique whose tag count dilutes them equally, and the tie falls to the
+higher-coverage (usually later, longer) clause. Domain scores each clause in
+its own sub-engine, where the leading clause's intent stands alone and is
+diluted less. Domain resolves the labelled (leading) intent on all 6; flat on
+2. Domain ends 1 point ahead overall (88.2% vs 87.2%) with fewer false
+positives and false negatives.
 
-**Two-stage routing trades recall for precision.** The hierarchical engine
-edges ahead — 94.7% vs 94.2% — but the gain is a precision/recall swap, not a
-free win:
+**Hierarchical trades recall for precision, and here comes out ahead.** Its
+stage-1 gate cuts false positives from ~24 to 9 (true negatives 36 → 49): a
+no-match utterance carrying a bare `stop` / `cancel` is routed to a two-slot
+domain where nothing fires, so no intent is emitted. That lifts precision to
+93.4%. The cost is recall: 12 false negatives, because a real command that the
+classifier misroutes — a one-word command, or one carrying a long room word
+that outweighs the intent keyword — is unrecoverable. On this dataset the
+precision gain outweighs the recall loss and hierarchical leads at 90.3%, but
+that balance depends entirely on how command-like the no-match traffic is.
 
-- It suppresses **3 false positives**. Each is a no-match utterance containing
-  a bare keyword for a *single-slot* intent — `"they cancel each other out"`,
-  `"stop right there"`, `"can you cancel it"`. Flat fires `stop_all` on the
-  lone `stop` / `cancel`. The classifier routes these to a *two-slot* domain
-  (*media* or *timers*), whose intents need a second keyword that is absent, so
-  nothing fires and no false positive is emitted. FP drops 10 → 7, precision
-  rises 92.6% → 94.6%.
-- It costs **2 false negatives**. Bare `"stop"` and `"cancel"`, issued as real
-  `stop_all` commands, are routed by the *same* mechanism to a domain that does
-  not own `stop_all`, so the command is lost. Recall drops 100% → 98.4%.
-
-Both effects come from one cause: a one-word utterance gives the stage-1
-classifier nothing to disambiguate, so it routes by a vocabulary-overlap
-tie-break. When the utterance is genuinely off-topic that accidentally helps;
-when it is a real command it hurts. Two-stage routing cannot recover an
-utterance whose domain is ambiguous from its own text.
-
-**Routing must be reliable for two-stage to be viable.** Stage 1 here is a
-keyword-coverage classifier and routes 98% of match cases correctly — only
-because the dataset's OBJECT vocabularies are domain-distinctive. With muddy,
-overlapping domain vocabulary the router degrades and every misroute is an
-unrecoverable error; two-stage is only worth it when domains are lexically
-separable.
+**Routing must be reliable for two-stage to pay off.** Stage 1 routes 91% of
+match cases correctly. Every one of the 9% misroutes is an unrecoverable error.
+Two-stage is only viable when domain vocabularies are distinctive enough to
+classify; the discriminating section deliberately includes utterances where
+they are not, and hierarchical loses exactly those.
 
 **Latency.** Flat is fastest (~0.2 ms). Hierarchical (~0.3 ms) runs a cheap
 classifier plus one sub-engine. The parallel domain engine (~0.8 ms) evaluates
