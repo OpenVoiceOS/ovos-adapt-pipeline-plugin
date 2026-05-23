@@ -17,16 +17,15 @@ from functools import lru_cache
 from threading import Lock
 from typing import List, Optional, Iterable, Union, Dict
 
-from langcodes import closest_match
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
 from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
+from ovos_spec_tools import closest_lang, standardize_lang
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
-from ovos_utils.lang import standardize_lang_tag
 from ovos_utils.log import LOG
 from ovos_workshop.intents import open_intent_envelope
 
@@ -58,11 +57,11 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         core_config = Configuration()
         config = config or core_config.get("context", {})  # legacy mycroft-core path
         super().__init__(bus, config)
-        self.lang = standardize_lang_tag(core_config.get("lang", "en-US"))
+        self.lang = standardize_lang(core_config.get("lang", "en-US"))
         langs = core_config.get('secondary_langs') or []
         if self.lang not in langs:
             langs.append(self.lang)
-        langs = [standardize_lang_tag(l) for l in langs]
+        langs = [standardize_lang(l) for l in langs]
         self.engines = {lang: IntentDeterminationEngine()
                         for lang in langs}
 
@@ -217,14 +216,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
 
     def _get_closest_lang(self, lang: str) -> Optional[str]:
         if self.engines:
-            lang = standardize_lang_tag(lang)
-            closest, score = closest_match(lang, list(self.engines.keys()))
-            # https://langcodes-hickford.readthedocs.io/en/sphinx/index.html#distance-values
-            # 0 -> These codes represent the same language, possibly after filling in values and normalizing.
-            # 1- 3 -> These codes indicate a minor regional difference.
-            # 4 - 10 -> These codes indicate a significant but unproblematic regional difference.
-            if score < 10:
-                return closest
+            return closest_lang(lang, list(self.engines.keys()))
         return None
 
     def register_vocabulary(self, entity_value: str, entity_type: str,
@@ -240,8 +232,8 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             entity_type: the type/tag of an entity instance
             alias_of: entity this is an alternative for
         """
-        lang = standardize_lang_tag(lang)
-        if lang in self.engines:
+        lang = self._get_closest_lang(lang)
+        if lang is not None:
             with self.lock:
                 if regex_str:
                     self.engines[lang].register_regex_entity(regex_str)
@@ -323,7 +315,9 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
 
     @property
     def registered_intents(self):
-        lang = get_message_lang()
+        lang = self._get_closest_lang(get_message_lang())
+        if lang is None:
+            return []
         return [parser.__dict__ for parser in self.engines[lang].intent_parsers]
 
     def handle_register_vocab(self, message):
@@ -438,11 +432,11 @@ class DomainAdaptPipeline(AdaptPipeline):
         # Skip AdaptPipeline.__init__ to avoid building a flat engine; call
         # the grandparent initializer directly.
         ConfidenceMatcherPipeline.__init__(self, bus, config)
-        self.lang = standardize_lang_tag(core_config.get("lang", "en-US"))
+        self.lang = standardize_lang(core_config.get("lang", "en-US"))
         langs = core_config.get('secondary_langs') or []
         if self.lang not in langs:
             langs.append(self.lang)
-        langs = [standardize_lang_tag(l) for l in langs]
+        langs = [standardize_lang(l) for l in langs]
         self.engines = {lang: self._engine_class()
                         for lang in langs}
 
@@ -580,8 +574,8 @@ class DomainAdaptPipeline(AdaptPipeline):
     def register_vocabulary(self, entity_value: str, entity_type: str,
                             alias_of: str, regex_str: str, lang: str):
         """Register skill vocabulary, routed by entity_type to a domain."""
-        lang = standardize_lang_tag(lang)
-        if lang in self.engines:
+        lang = self._get_closest_lang(lang)
+        if lang is not None:
             with self.lock:
                 domain = self._resolve_entity_domain(lang, entity_type)
                 if regex_str:
@@ -621,7 +615,9 @@ class DomainAdaptPipeline(AdaptPipeline):
 
     @property
     def registered_intents(self):
-        lang = get_message_lang()
+        lang = self._get_closest_lang(get_message_lang())
+        if lang is None:
+            return []
         out = []
         for sub in self.engines[lang].domains.values():
             out.extend(parser.__dict__ for parser in sub.intent_parsers)
