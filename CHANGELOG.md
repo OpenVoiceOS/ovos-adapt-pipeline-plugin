@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.1a1) (2026-05-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.0a1...1.3.1a1)
+
+**Merged pull requests:**
+
+- fix: bucket engines by full BCP-47 tag, migrate to ovos-spec-tools [\#42](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/42) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.3.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.0a1) (2026-05-22)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.2.0a2...1.3.0a1)
