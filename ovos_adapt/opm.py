@@ -23,12 +23,12 @@ from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
-from ovos_spec_tools import closest_lang, standardize_lang
+from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
 
-from ovos_adapt.intent import open_intent_envelope
+from ovos_adapt.intent import open_intent_envelope, IntentBuilder
 from ovos_adapt.engine import (IntentDeterminationEngine,
                                 DomainIntentDeterminationEngine,
                                 HierarchicalIntentDeterminationEngine)
@@ -82,6 +82,8 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         self.bus.on('intent.service.adapt.get', self.handle_get_adapt)
         self.bus.on('intent.service.adapt.manifest.get', self.handle_adapt_manifest)
         self.bus.on('intent.service.adapt.vocab.manifest.get', self.handle_vocab_manifest)
+
+        self._register_spec_handlers()
 
     def update_context(self, intent):
         """Updates context with keyword from the intent.
@@ -393,6 +395,224 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         self.bus.emit(message.reply("intent.service.adapt.vocab.manifest",
                                     {"vocab": self.registered_vocab}))
 
+    # ------------------------------------------------------------------
+    # OVOS-INTENT-4 spec registration topics (consumed alongside legacy)
+    # ------------------------------------------------------------------
+    def _register_spec_handlers(self):
+        """Subscribe to the OVOS-INTENT-4 registration topics.
+
+        These run *in addition* to the legacy ``register_vocab`` /
+        ``register_intent`` / ``detach_*`` handlers — un-migrated skills keep
+        working unchanged. The spec consolidates vocab + intent into one
+        ``ovos.intent.register.keyword`` payload (INTENT-4 §5), so this
+        handler builds the adapt IntentBuilder *and* registers the inline
+        vocabularies in a single pass.
+        """
+        self.bus.on(SpecMessage.INTENT_REGISTER_KEYWORD,
+                    self.handle_spec_register_keyword)
+        self.bus.on(SpecMessage.ENTITY_REGISTER,
+                    self.handle_spec_register_entity)
+        self.bus.on(SpecMessage.INTENT_DEREGISTER,
+                    self.handle_spec_deregister_intent)
+        self.bus.on(SpecMessage.ENTITY_DEREGISTER,
+                    self.handle_spec_deregister_entity)
+        self.bus.on(SpecMessage.SKILL_DEREGISTER,
+                    self.handle_spec_deregister_skill)
+        self.bus.on(SpecMessage.INTENT_ENABLE,
+                    self.handle_spec_enable_intent)
+        self.bus.on(SpecMessage.INTENT_DISABLE,
+                    self.handle_spec_disable_intent)
+
+    @staticmethod
+    def _spec_entity_type(skill_id: str, name: str) -> str:
+        """Namespace a spec vocabulary ``name`` to an adapt entity_type.
+
+        INTENT-4 vocabulary ``name`` is unique within a skill (§5.1); adapt
+        entity_types are a global namespace. We prefix with the same
+        normalized skill_id form the legacy detach helpers key off
+        (:func:`_entity_skill_id`) so ``detach_skill`` reaches these too.
+        """
+        return f"{_entity_skill_id(skill_id)}{name}"
+
+    @staticmethod
+    def _spec_intent_name(skill_id: str, intent_name: str) -> str:
+        """Build the adapt intent label (``skill_id:intent_name``).
+
+        Mirrors the legacy convention: skills emit IntentBuilder names of the
+        form ``<skill_id>:<intent_name>`` so detach-by-skill and the
+        match-result ``intent_type`` carry the owning skill.
+        """
+        if ":" in intent_name:
+            return intent_name
+        return f"{skill_id}:{intent_name}"
+
+    def _register_spec_vocab(self, descriptor: dict, skill_id: str,
+                             lang: str) -> Optional[str]:
+        """Register one INTENT-4 vocabulary descriptor (§5.1) into adapt.
+
+        Each ``samples`` entry is a slot-free INTENT-1 template; adapt's
+        ``register_entity`` expands ``(a|b)`` / ``[opt]`` syntax itself, so
+        samples are passed through verbatim. Returns the namespaced
+        entity_type, or ``None`` if the descriptor is malformed.
+        """
+        name = descriptor.get("name")
+        samples = descriptor.get("samples") or []
+        if not name or not samples:
+            return None
+        entity_type = self._spec_entity_type(skill_id, name)
+        for sample in samples:
+            if not sample:
+                continue
+            self.register_vocabulary(sample, entity_type, None, None, lang)
+            self.registered_vocab.append({"entity_value": sample,
+                                          "entity_type": entity_type})
+        return entity_type
+
+    def handle_spec_register_keyword(self, message):
+        """Consume ``ovos.intent.register.keyword`` (INTENT-4 §5).
+
+        Translates the consolidated keyword payload into adapt's split
+        vocab + IntentBuilder model:
+
+        - ``required[]``  -> register_entity(name) + IntentBuilder.require(name)
+        - ``optional[]``  -> register_entity(name) + .optionally(name)
+        - ``one_of[][]``  -> register every member + .one_of(*group)
+        - ``excluded[]``  -> register_entity(name) + .exclude(name)
+        """
+        data = message.data
+        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        intent_name = data.get("intent_name")
+        lang = standardize_lang(data.get("lang") or get_message_lang(message))
+
+        required = data.get("required") or []
+        optional = data.get("optional") or []
+        one_of = data.get("one_of") or []
+        excluded = data.get("excluded") or []
+
+        if not skill_id or not intent_name:
+            LOG.warning(f"ignoring malformed {SpecMessage.INTENT_REGISTER_KEYWORD} "
+                        f"registration (lang={lang}): missing skill_id/intent_name")
+            return
+        # INTENT-3 §4.2 / INTENT-4 §5.3: required and one_of MUST NOT both be empty
+        if not required and not one_of:
+            LOG.warning(f"ignoring malformed keyword intent "
+                        f"{skill_id}:{intent_name} (lang={lang}, topic="
+                        f"{SpecMessage.INTENT_REGISTER_KEYWORD}): required and "
+                        f"one_of are both empty")
+            return
+
+        builder = IntentBuilder(self._spec_intent_name(skill_id, intent_name))
+
+        for descriptor in required:
+            entity_type = self._register_spec_vocab(descriptor, skill_id, lang)
+            if entity_type is None:
+                LOG.warning(f"ignoring malformed keyword intent "
+                            f"{skill_id}:{intent_name} (lang={lang}): a required "
+                            f"vocabulary descriptor lacks name/samples")
+                return
+            builder.require(entity_type)
+
+        for descriptor in optional:
+            entity_type = self._register_spec_vocab(descriptor, skill_id, lang)
+            if entity_type is not None:
+                builder.optionally(entity_type)
+
+        for group in one_of:
+            members = []
+            for descriptor in group:
+                entity_type = self._register_spec_vocab(descriptor, skill_id, lang)
+                if entity_type is not None:
+                    members.append(entity_type)
+            if members:
+                builder.one_of(*members)
+
+        for descriptor in excluded:
+            entity_type = self._register_spec_vocab(descriptor, skill_id, lang)
+            if entity_type is not None:
+                builder.exclude(entity_type)
+
+        self.register_intent(builder.build())
+
+    def handle_spec_register_entity(self, message):
+        """Consume ``ovos.entity.register`` (INTENT-4 §7).
+
+        Registers an ``.entity`` value-set into the adapt trie. Each
+        ``samples`` entry is a slot-free value (INTENT-1 §5.4).
+        """
+        data = message.data
+        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        entity_name = data.get("entity_name")
+        lang = standardize_lang(data.get("lang") or get_message_lang(message))
+        samples = data.get("samples") or []
+        if not skill_id or not entity_name or not samples:
+            LOG.warning(f"ignoring malformed {SpecMessage.ENTITY_REGISTER} "
+                        f"registration (entity_name={entity_name}, lang={lang}): "
+                        f"missing skill_id/entity_name/samples")
+            return
+        self._register_spec_vocab({"name": entity_name, "samples": samples},
+                                  skill_id, lang)
+
+    def handle_spec_deregister_intent(self, message):
+        """Consume ``ovos.intent.deregister`` (INTENT-4 §8.2)."""
+        data = message.data
+        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        intent_name = data.get("intent_name")
+        if not skill_id or not intent_name:
+            return
+        self.detach_intent(self._spec_intent_name(skill_id, intent_name))
+
+    def handle_spec_deregister_entity(self, message):
+        """Consume ``ovos.entity.deregister`` (INTENT-4 §8.3)."""
+        data = message.data
+        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        entity_name = data.get("entity_name")
+        if not skill_id or not entity_name:
+            return
+        entity_type = self._spec_entity_type(skill_id, entity_name)
+
+        def match_entity(d):
+            return d and d[1] == entity_type
+
+        with self.lock:
+            for lang in self.engines:
+                self.engines[lang].drop_entity(match_func=match_entity)
+
+    def handle_spec_deregister_skill(self, message):
+        """Consume ``ovos.skill.deregister`` (INTENT-4 §8.4)."""
+        data = message.data
+        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        if not skill_id:
+            return
+        self.detach_skill(skill_id)
+
+    def handle_spec_disable_intent(self, message):
+        """Consume ``ovos.intent.disable`` (INTENT-4 §8.5).
+
+        Adds the intent to the session blacklist so it is excluded from match
+        candidacy without losing its registration.
+        """
+        data = message.data
+        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        intent_name = data.get("intent_name")
+        if not skill_id or not intent_name:
+            return
+        intent_type = self._spec_intent_name(skill_id, intent_name)
+        sess = SessionManager.get(message)
+        if intent_type not in sess.blacklisted_intents:
+            sess.blacklisted_intents.append(intent_type)
+
+    def handle_spec_enable_intent(self, message):
+        """Consume ``ovos.intent.enable`` (INTENT-4 §8.5)."""
+        data = message.data
+        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        intent_name = data.get("intent_name")
+        if not skill_id or not intent_name:
+            return
+        intent_type = self._spec_intent_name(skill_id, intent_name)
+        sess = SessionManager.get(message)
+        if intent_type in sess.blacklisted_intents:
+            sess.blacklisted_intents.remove(intent_type)
+
 
 def _domain_from_intent_name(intent_name: str) -> str:
     """Extract skill_id domain from an intent label.
@@ -463,6 +683,8 @@ class DomainAdaptPipeline(AdaptPipeline):
         self.bus.on('intent.service.adapt.get', self.handle_get_adapt)
         self.bus.on('intent.service.adapt.manifest.get', self.handle_adapt_manifest)
         self.bus.on('intent.service.adapt.vocab.manifest.get', self.handle_vocab_manifest)
+
+        self._register_spec_handlers()
 
     def _resolve_entity_domain(self, lang: str, entity_type: str) -> str:
         """Best-effort lookup of the domain that owns an entity_type.
