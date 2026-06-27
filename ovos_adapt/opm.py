@@ -27,8 +27,8 @@ from ovos_spec_tools import closest_lang, standardize_lang
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
-from ovos_workshop.intents import open_intent_envelope
 
+from ovos_adapt.intent import open_intent_envelope
 from ovos_adapt.engine import (IntentDeterminationEngine,
                                 DomainIntentDeterminationEngine,
                                 HierarchicalIntentDeterminationEngine)

@@ -15,7 +15,7 @@ are registered.
 from unittest import TestCase, mock
 
 from ovos_bus_client.message import Message
-from ovos_workshop.intents import IntentBuilder
+from ovos_adapt.intent import IntentBuilder
 
 from ovos_adapt.engine import DomainIntentDeterminationEngine
 from ovos_adapt.opm import DomainAdaptPipeline
