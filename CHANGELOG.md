@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.3a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.3a1) (2026-06-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.2a1...1.3.3a1)
+
+**Merged pull requests:**
+
+- fix: guard None session blacklists in intent match filters [\#47](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/47) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.3.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.2a1) (2026-06-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.1a1...1.3.2a1)
