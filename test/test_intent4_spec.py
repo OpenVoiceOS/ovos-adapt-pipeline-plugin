@@ -124,7 +124,7 @@ class TestIntent4KeywordRegistration(TestCase):
 
     def test_legacy_flow_still_works(self):
         """Legacy register_vocab/register_intent path is untouched."""
-        from ovos_workshop.intents import IntentBuilder
+        from ovos_adapt.intent import IntentBuilder
         self.pipeline.handle_register_vocab(
             Message("register_vocab",
                     {"entity_value": "test", "entity_type": "testKeyword"}))
