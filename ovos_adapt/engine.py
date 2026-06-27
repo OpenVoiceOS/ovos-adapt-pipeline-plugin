@@ -22,6 +22,7 @@ from ovos_adapt.entity_tagger import EntityTagger
 from ovos_adapt.parser import Parser
 from ovos_adapt.tools.text.tokenizer import EnglishTokenizer
 from ovos_adapt.tools.text.trie import Trie
+from ovos_adapt.intent import Intent
 
 __author__ = 'seanfitz'
 
@@ -233,6 +234,22 @@ class IntentDeterminationEngine(object):
         Raises:
             ValueError: on invalid intent
         """
+        # Intents built via the shared ovos-spec-tools primitive (e.g.
+        # ovos-workshop re-exporting IntentBuilder) carry the same fields but
+        # lack adapt's matching API (validate / validate_with_tags). Rebuild
+        # them as an adapt Intent so they can be matched. Skills registering
+        # over the bus already get this via open_intent_envelope; this covers
+        # direct in-process registration.
+        if not (hasattr(intent_parser, 'validate_with_tags') and
+                callable(getattr(intent_parser, 'validate_with_tags', None))):
+            if all(hasattr(intent_parser, attr) for attr in
+                   ('name', 'requires', 'at_least_one', 'optional', 'excludes')):
+                intent_parser = Intent(intent_parser.name,
+                                       intent_parser.requires,
+                                       intent_parser.at_least_one,
+                                       intent_parser.optional,
+                                       intent_parser.excludes)
+
         if hasattr(intent_parser, 'validate') and callable(intent_parser.validate):
             self.intent_parsers.append(intent_parser)
         else:
