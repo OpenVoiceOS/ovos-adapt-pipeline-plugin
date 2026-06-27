@@ -19,7 +19,7 @@ from ovoscope import (  # noqa: E402
     register_adapt_intent,
     register_adapt_vocab,
 )
-from ovos_workshop.intents import IntentBuilder  # noqa: E402
+from ovos_adapt.intent import IntentBuilder  # noqa: E402
 
 from ovos_adapt.opm import AdaptPipeline  # noqa: E402
 
