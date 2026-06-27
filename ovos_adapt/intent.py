@@ -17,35 +17,31 @@ __author__ = 'seanfitz'
 
 import itertools
 
+from ovos_spec_tools.intent import Intent as _SpecIntent
+from ovos_spec_tools.intent import IntentBuilder as _SpecIntentBuilder
+from ovos_spec_tools.intent import open_intent_envelope as _spec_open_intent_envelope
+
 CLIENT_ENTITY_NAME = 'Client'
 
 
-class Intent:
+class Intent(_SpecIntent):
     """An adapt intent parser carrying its own matching logic.
 
     This is the adapt engine's matching primitive: every parser registered
     with :class:`~ovos_adapt.engine.IntentDeterminationEngine` must expose
-    :meth:`validate` / :meth:`validate_with_tags`. It is the canonical home
-    for these classes — the OVOS adapt parser owns them rather than borrowing
-    them from ``ovos-workshop`` (which previously re-exported a copy).
+    :meth:`validate` / :meth:`validate_with_tags`.
+
+    The **declarative** half — the ``name`` / ``requires`` / ``at_least_one`` /
+    ``optional`` / ``excludes`` role lists and :meth:`to_keyword_payload`
+    emission — is the canonical OVOS-INTENT-4 :class:`ovos_spec_tools.intent.Intent`
+    DTO, which this class subclasses rather than duplicates. Only the
+    adapt-engine **matching** logic (:meth:`validate` /
+    :meth:`validate_with_tags` and the private tag-search helpers) lives here.
+
+    Subclasses of this remain ``isinstance`` of the spec-tools DTO, so anything
+    consuming the INTENT-4 definition surface (e.g. registration producers)
+    works unchanged on an adapt parser.
     """
-
-    def __init__(self, name="", requires=None, at_least_one=None,
-                 optional=None, excludes=None):
-        """Create Intent object
-
-        Args:
-            name(str): Name for Intent
-            requires(list): Entities that are required
-            at_least_one(list): One of these Entities are required
-            optional(list): Optional Entities used by the intent
-            excludes(list): Entities that must NOT be present
-        """
-        self.name = name
-        self.requires = requires or []
-        self.at_least_one = at_least_one or []
-        self.optional = optional or []
-        self.excludes = excludes or []
 
     def validate(self, tags, confidence):
         """Using this method removes tags from the result of validate_with_tags
@@ -195,110 +191,29 @@ class Intent:
         return None, None, None
 
 
-class IntentBuilder:
-    """
-    IntentBuilder, used to construct intent parsers.
+class IntentBuilder(_SpecIntentBuilder):
+    """IntentBuilder, used to construct adapt intent parsers.
 
-    Attributes:
-        at_least_one(list): A list of Entities where one is required.
-            These are separated into lists so you can have one of (A or B) and
-            then require one of (D or F).
-        requires(list): A list of Required Entities
-        optional(list): A list of optional Entities
-        excludes(list): A list of forbidden Entities
-        name(str): Name of intent
+    Inherits the fluent ``require`` / ``optionally`` / ``one_of`` / ``exclude``
+    role accumulation from the canonical OVOS-INTENT-4
+    :class:`ovos_spec_tools.intent.IntentBuilder`. Only :meth:`build` is
+    overridden, so the produced object is adapt's matching :class:`Intent`
+    (which is itself a spec-tools ``Intent``) rather than the bare DTO.
 
     Notes:
         This is designed to allow construction of intents in one line.
 
     Example:
         IntentBuilder("Intent")\
-            .requires("A")\
+            .require("A")\
             .one_of("C","D")\
             .optional("G").build()
     """
 
-    def __init__(self, intent_name):
-        """
-        Constructor
-
-        Args:
-            intent_name(str): the name of the intents that this parser
-            parses/validates
-        """
-        self.at_least_one = []
-        self.requires = []
-        self.excludes = []
-        self.optional = []
-        self.name = intent_name
-
-    def one_of(self, *args):
-        """
-        The intent parser should require one of the provided entity types to
-        validate this clause.
-
-        Args:
-            args(args): *args notation list of entity names
-
-        Returns:
-            self: to continue modifications.
-        """
-        self.at_least_one.append(args)
-        return self
-
-    def require(self, entity_type, attribute_name=None):
-        """
-        The intent parser should require an entity of the provided type.
-
-        Args:
-            entity_type(str): an entity type
-            attribute_name(str): the name of the attribute on the parsed intent.
-            Defaults to match entity_type.
-
-        Returns:
-            self: to continue modifications.
-        """
-        if not attribute_name:
-            attribute_name = entity_type
-        self.requires += [(entity_type, attribute_name)]
-        return self
-
-    def exclude(self, entity_type):
-        """
-        The intent parser must not contain an entity of the provided type.
-
-        Args:
-            entity_type(str): an entity type
-
-        Returns:
-            self: to continue modifications.
-        """
-        self.excludes.append(entity_type)
-        return self
-
-    def optionally(self, entity_type, attribute_name=None):
-        """
-        Parsed intents from this parser can optionally include an entity of the
-         provided type.
-
-        Args:
-            entity_type(str): an entity type
-            attribute_name(str): the name of the attribute on the parsed intent.
-            Defaults to match entity_type.
-
-        Returns:
-            self: to continue modifications.
-        """
-        if not attribute_name:
-            attribute_name = entity_type
-        self.optional += [(entity_type, attribute_name)]
-        return self
-
     def build(self):
-        """
-        Constructs an intent from the builder's specifications.
+        """Constructs an adapt :class:`Intent` from the builder's specifications.
 
-        :return: an Intent instance.
+        :return: an Intent instance with adapt matching logic.
         """
         return Intent(self.name, self.requires,
                       self.at_least_one, self.optional,
@@ -306,13 +221,16 @@ class IntentBuilder:
 
 
 def open_intent_envelope(message):
-    """Convert dictionary received over messagebus to Intent."""
-    intent_dict = message.data
-    return Intent(intent_dict.get('name'),
-                  intent_dict.get('requires'),
-                  intent_dict.get('at_least_one'),
-                  intent_dict.get('optional'),
-                  intent_dict.get('excludes'))
+    """Convert dictionary received over messagebus to adapt :class:`Intent`.
+
+    Parses the envelope with the canonical spec-tools helper (which accepts
+    both the legacy and OVOS-INTENT-4 §5.2 wire keys) and re-wraps the result
+    as adapt's matching :class:`Intent`.
+    """
+    spec_intent = _spec_open_intent_envelope(message)
+    return Intent(spec_intent.name, spec_intent.requires,
+                  spec_intent.at_least_one, spec_intent.optional,
+                  spec_intent.excludes)
 
 
 def is_entity(tag, entity_name):
