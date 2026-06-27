@@ -31,7 +31,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov"]
+test = [
+    "pytest",
+    "pytest-cov",
+    # INTENT-4 consumer e2e stack floor (ovos.intent.register.* topics +
+    # E2EPipelineHarness namespace flags). Mirrors ovos-test-harness@dev.
+    "ovos-bus-client>=2.4.0a1",
+    "ovos-spec-tools>=0.16.1a2",
+]
 
 [project.urls]
 Homepage = "https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin"

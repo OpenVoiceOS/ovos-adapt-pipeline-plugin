@@ -598,6 +598,8 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             return
         intent_type = self._spec_intent_name(skill_id, intent_name)
         sess = SessionManager.get(message)
+        if sess.blacklisted_intents is None:
+            sess.blacklisted_intents = []
         if intent_type not in sess.blacklisted_intents:
             sess.blacklisted_intents.append(intent_type)
 
@@ -610,7 +612,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             return
         intent_type = self._spec_intent_name(skill_id, intent_name)
         sess = SessionManager.get(message)
-        if intent_type in sess.blacklisted_intents:
+        if intent_type in (sess.blacklisted_intents or []):
             sess.blacklisted_intents.remove(intent_type)
 
 
