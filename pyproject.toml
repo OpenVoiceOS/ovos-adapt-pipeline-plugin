@@ -38,6 +38,13 @@ test = [
     # E2EPipelineHarness namespace flags). Mirrors ovos-test-harness@dev.
     "ovos-bus-client>=2.4.0a1",
     "ovos-spec-tools>=0.16.1a2",
+    # ovos-workshop 9.0.1a2 regressed IntentBuilder.build(): it now returns an
+    # ovos_spec_tools.intent.Intent that lacks .validate / .validate_with_tags,
+    # which ovos_adapt.engine.register_intent_parser requires — breaking BOTH
+    # the legacy and the INTENT-4 spec registration paths. Pin the last good
+    # prerelease (9.0.0a1, which still satisfies bus-client>=2.4.0a1) until the
+    # upstream regression is fixed. See report / ovos-workshop.
+    "ovos-workshop==9.0.0a1",
 ]
 
 [project.urls]
