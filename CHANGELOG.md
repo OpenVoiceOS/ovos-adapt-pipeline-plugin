@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.4.0a1) (2026-06-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.4a1...1.4.0a1)
+
+**Merged pull requests:**
+
+- feat: consume OVOS-INTENT-4 keyword registration \(alongside legacy\) [\#44](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/44) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.3.4a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.4a1) (2026-06-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.3a1...1.3.4a1)
