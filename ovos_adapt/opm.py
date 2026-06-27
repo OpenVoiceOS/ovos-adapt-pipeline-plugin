@@ -178,8 +178,8 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             best = best_intent.get('confidence', 0.0) if best_intent else 0.0
             conf = intent.get('confidence', 0.0)
             skill = intent['intent_type'].split(":")[0]
-            if best < conf and intent["intent_type"] not in sess.blacklisted_intents \
-                    and skill not in sess.blacklisted_skills:
+            if best < conf and intent["intent_type"] not in (sess.blacklisted_intents or []) \
+                    and skill not in (sess.blacklisted_skills or []):
                 best_intent = intent
                 # TODO - Shouldn't Adapt do this?
                 best_intent['utterance'] = utt
@@ -532,8 +532,8 @@ class DomainAdaptPipeline(AdaptPipeline):
             best = best_intent.get('confidence', 0.0) if best_intent else 0.0
             conf = intent.get('confidence', 0.0)
             skill = intent['intent_type'].split(":")[0]
-            if best < conf and intent["intent_type"] not in sess.blacklisted_intents \
-                    and skill not in sess.blacklisted_skills:
+            if best < conf and intent["intent_type"] not in (sess.blacklisted_intents or []) \
+                    and skill not in (sess.blacklisted_skills or []):
                 best_intent = intent
                 best_intent['utterance'] = utt
 
