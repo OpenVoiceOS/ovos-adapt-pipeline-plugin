@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.2a1) (2026-06-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.1a1...1.3.2a1)
+
+**Merged pull requests:**
+
+- fix\(deps\): allow ovos-workshop 9.x \(widen \<9.0.0 -\> \<10.0.0\) [\#45](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/45) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.3.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.1a1) (2026-05-23)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.0a1...1.3.1a1)
