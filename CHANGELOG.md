@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.4.1a1) (2026-06-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.4.0a1...1.4.1a1)
+
+**Merged pull requests:**
+
+- fix: default config value [\#30](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/30) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.4.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.4.0a1) (2026-06-27)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.4a1...1.4.0a1)
