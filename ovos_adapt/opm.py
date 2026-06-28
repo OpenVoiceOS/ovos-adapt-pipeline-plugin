@@ -53,8 +53,9 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
     """Intent service wrapping the Adapt intent Parser."""
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
-                 config: Optional[Dict] = None):       
-        intent_config = Configuration().get('intents', {})
+                 config: Optional[Dict] = None):
+        core_config = Configuration()
+        intent_config = core_config.get('intents', {})
         config = config or intent_config.get("ovos-adapt-pipeline-plugin") or intent_config.get("adapt") or dict()
         super().__init__(bus, config)
         self.lang = standardize_lang(core_config.get("lang", "en-US"))
