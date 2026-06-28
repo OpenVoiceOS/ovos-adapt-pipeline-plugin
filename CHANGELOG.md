@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.4.2a1) (2026-06-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.4.1a1...1.4.2a1)
+
+**Merged pull requests:**
+
+- fix: lift ovos-spec-tools upper bound \(spec-tools 1.x\) [\#53](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/53) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.4.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.4.1a1) (2026-06-28)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.4.0a1...1.4.1a1)
