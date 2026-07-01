@@ -34,6 +34,81 @@ from ovos_adapt.engine import (IntentDeterminationEngine,
                                 HierarchicalIntentDeterminationEngine)
 
 
+def _to_alnum(skill_id: str) -> str:
+    """``skill_id`` reduced to alphanumerics + ``_``, matching workshop's
+    ``alphanumeric_skill_id`` / ``munge_intent_parser`` so context keywords
+    derived from a private intent-context entry line up with a same-skill
+    intent's munged ``.require()`` keyword."""
+    return ''.join(c if c.isalnum() else '_' for c in str(skill_id))
+
+
+def _intent_context_as_adapt_frames(sess) -> list:
+    """Project live ``session.intent_context`` entries (OVOS-CONTEXT-1 §2) onto
+    adapt context frames so the engine's existing ``.require()`` / context
+    gating honours the spec's fold-surviving mutation channel.
+
+    Why: a handler mutates ``intent_context`` via ``ovos.session.sync`` (§5.3,
+    merged entry-by-entry) — the only mutation that survives the
+    last-writer-wins session fold on ordinary receives. The legacy pathway
+    (``add_context`` -> in-place ``sess.context`` frame injection) is wiped by
+    the next fold, so_intent_context is the durable store. adapt, however,
+    gates on the legacy ``context_manager`` (``sess.context``) frames, not on
+    ``intent_context`` directly. This bridge hydrates the frame list adapt
+    consumes from the durable ``intent_context`` entries, without mutating
+    ``sess.context`` on the wire (the merged list is built fresh per match and
+    discarded).
+
+    Mapping (§3 scope):
+      - private key ``<skill_id>:<sub>`` -> frame with context keyword
+        ``_to_alnum(<skill_id>) + <sub>`` (matches the munge a same-skill
+        intent's ``.require(<sub>)`` receives) and ``word = <sub>``.
+      - shared bare key ``<key>`` -> frame with context keyword ``<key>``
+        and ``word = <key>`` (a private-scope gate never resolves to a shared
+        entry per §3.1, so bare-key frames only satisfy shared-scope requires).
+
+    A ``null`` entry (a §5.3 deletion marker) is skipped — it denotes absence.
+    """
+    frames = []
+    ic = getattr(sess, "intent_context", None) or {}
+    for key, entry in (ic or {}).items():
+        if entry is None:
+            continue
+        if ":" in key:
+            sid, sub = key.split(":", 1)
+            ctx_kw = _to_alnum(sid) + sub
+            origin = sid
+        else:
+            ctx_kw = key
+            sub = key
+            origin = ""
+        frames.append({
+            'data': [(sub, ctx_kw)],
+            'key': sub, 'match': sub,
+            'confidence': 1.0, 'origin': origin,
+        })
+    return frames
+
+
+class _MergedContextManager:
+    """Minimal ``context_manager`` adapter: returns a precomputed context
+    frame list from ``get_context()``. Built by combining ``sess.context``'s
+    legacy frames with the ``intent_context`` projection so the live session
+    is never mutated on the wire."""
+
+    def __init__(self, frames: list):
+        self._frames = frames
+
+    def get_context(self, *args, **kwargs):
+        return list(self._frames)
+
+
+def _adapt_context_manager(sess):
+    """Build the context_manager adapt should gate on: the live session's
+    legacy ``sess.context`` frames plus the ``intent_context`` projection."""
+    frames = list(sess.context.get_context()) + _intent_context_as_adapt_frames(sess)
+    return _MergedContextManager(frames)
+
+
 def _entity_skill_id(skill_id):
     """Helper converting a skill id to the format used in entities.
 
@@ -192,7 +267,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                 intents = [i for i in self.engines[lang].determine_intent(
                     utt, 100,
                     include_tags=True,
-                    context_manager=sess.context)]
+                    context_manager=_adapt_context_manager(sess))]
                 if intents:
                     utt_best = max(
                         intents, key=lambda x: x.get('confidence', 0.0)
@@ -721,7 +796,7 @@ class DomainAdaptPipeline(AdaptPipeline):
         for sub in sub_engines:
             for it in sub.determine_intent(
                     utterance=utt, num_results=1, include_tags=True,
-                    context_manager=sess.context):
+                    context_manager=_adapt_context_manager(sess)):
                 candidates.append(it)
         return candidates
 
@@ -867,4 +942,4 @@ class HierarchicalAdaptPipeline(DomainAdaptPipeline):
         with self.lock:
             return list(engine.determine_intent(
                 utterance=utt, num_results=1, include_tags=True,
-                context_manager=sess.context))
+                context_manager=_adapt_context_manager(sess)))
