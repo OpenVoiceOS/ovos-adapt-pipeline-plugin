@@ -27,7 +27,7 @@ dependencies = [
     "ovos-plugin-manager>=2.4.0a1,<3.0.0",
     "ovos-utils>=0.3.4,<1.0.0",
     "ovos_bus_client>=2.5.1a1,<3.0.0",
-    "ovos-spec-tools>=0.16.1a2",
+    "ovos-spec-tools>=1.4.0a1",
     "langcodes",
 ]
 
@@ -38,7 +38,7 @@ test = [
     # INTENT-4 consumer e2e stack floor (ovos.intent.register.* topics +
     # E2EPipelineHarness namespace flags). Mirrors ovos-test-harness@dev.
     "ovos-bus-client>=2.5.1a1",
-    "ovos-spec-tools>=0.16.1a2",
+    "ovos-spec-tools>=1.4.0a1",
     # ovos-workshop 9.0.1a2 regressed IntentBuilder.build(): it now returns an
     # ovos_spec_tools.intent.Intent that lacks .validate / .validate_with_tags,
     # which ovos_adapt.engine.register_intent_parser requires — breaking BOTH
