@@ -23,7 +23,7 @@ from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
-from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage
+from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage, gate_satisfied
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
@@ -83,6 +83,10 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         self.bus.on('intent.service.adapt.get', self.handle_get_adapt)
         self.bus.on('intent.service.adapt.manifest.get', self.handle_adapt_manifest)
         self.bus.on('intent.service.adapt.vocab.manifest.get', self.handle_vocab_manifest)
+
+        # OVOS-CONTEXT-1 gate declarations, keyed by adapt intent label
+        # (``skill_id:intent_name``): {'requires': [...], 'excludes': [...]}.
+        self._context_gates: Dict[str, Dict] = {}
 
         self._register_spec_handlers()
 
@@ -192,7 +196,8 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                 intents = [i for i in self.engines[lang].determine_intent(
                     utt, 100,
                     include_tags=True,
-                    context_manager=sess.context)]
+                    context_manager=sess.context)
+                    if self._context_gate_ok(i, sess)]
                 if intents:
                     utt_best = max(
                         intents, key=lambda x: x.get('confidence', 0.0)
@@ -221,6 +226,38 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         if self.engines:
             return closest_lang(lang, list(self.engines.keys()))
         return None
+
+    def _store_context_gate(self, intent_type: str, requires, excludes):
+        """Record OVOS-CONTEXT-1 gate declarations for an intent.
+
+        ``requires`` / ``excludes`` are ``requires_context`` /
+        ``excludes_context`` lists (bare-string or ``{key, scope}`` items).
+        A registration carrying neither leaves no entry, so ungated intents
+        keep their prior match behaviour unchanged.
+        """
+        if requires or excludes:
+            self._context_gates[intent_type] = {
+                "requires": requires or [],
+                "excludes": excludes or [],
+            }
+
+    def _context_gate_ok(self, intent: Dict, sess) -> bool:
+        """Evaluate the OVOS-CONTEXT-1 gate for a candidate match.
+
+        A candidate is admissible iff its stored ``requires_context`` keys
+        are all live in ``session.intent_context`` and none of its
+        ``excludes_context`` keys are (OVOS-CONTEXT-1 §6/§6.1). Intents
+        without a stored gate always pass. Live/scope/decay semantics live
+        entirely inside :func:`gate_satisfied`.
+        """
+        intent_type = intent.get('intent_type')
+        gate = self._context_gates.get(intent_type)
+        if not gate:
+            return True
+        skill_id = intent_type.split(':')[0]
+        return gate_satisfied(sess.intent_context or {},
+                              gate['requires'], gate['excludes'],
+                              owner_id=skill_id)
 
     def register_vocabulary(self, entity_value: str, entity_type: str,
                             alias_of: str, regex_str: str, lang: str):
@@ -346,6 +383,11 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         """
         intent = open_intent_envelope(message)
         self.register_intent(intent)
+        # OVOS-CONTEXT-1 §6 — accept gate declarations on the legacy payload.
+        self._store_context_gate(
+            intent.name,
+            message.data.get("requires_context"),
+            message.data.get("excludes_context"))
 
     def handle_detach_intent(self, message):
         """Remover adapt intent.
@@ -533,6 +575,10 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                 builder.exclude(entity_type)
 
         self.register_intent(builder.build())
+        # OVOS-CONTEXT-1 §6 — the register payload MAY declare context gates.
+        self._store_context_gate(
+            self._spec_intent_name(skill_id, intent_name),
+            data.get("requires_context"), data.get("excludes_context"))
 
     def handle_spec_register_entity(self, message):
         """Consume ``ovos.entity.register`` (INTENT-4 §7).
@@ -678,6 +724,9 @@ class DomainAdaptPipeline(AdaptPipeline):
             lang: {} for lang in langs
         }
 
+        # OVOS-CONTEXT-1 gate declarations, keyed by adapt intent label.
+        self._context_gates: Dict[str, Dict] = {}
+
         self.bus.on('register_vocab', self.handle_register_vocab)
         self.bus.on('register_intent', self.handle_register_intent)
         self.bus.on('detach_intent', self.handle_detach_intent)
@@ -722,7 +771,8 @@ class DomainAdaptPipeline(AdaptPipeline):
             for it in sub.determine_intent(
                     utterance=utt, num_results=1, include_tags=True,
                     context_manager=sess.context):
-                candidates.append(it)
+                if self._context_gate_ok(it, sess):
+                    candidates.append(it)
         return candidates
 
     @lru_cache(maxsize=3)
@@ -865,6 +915,7 @@ class HierarchicalAdaptPipeline(DomainAdaptPipeline):
     def _gather_candidates(self, engine, utt, sess):
         """Collect intent candidates from the single routed domain."""
         with self.lock:
-            return list(engine.determine_intent(
+            candidates = list(engine.determine_intent(
                 utterance=utt, num_results=1, include_tags=True,
                 context_manager=sess.context))
+        return [it for it in candidates if self._context_gate_ok(it, sess)]
