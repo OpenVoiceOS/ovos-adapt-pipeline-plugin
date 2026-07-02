@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.5.0a1) (2026-07-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.4.2a1...1.5.0a1)
+
+**Merged pull requests:**
+
+- feat: enforce OVOS-CONTEXT-1 requires\_context/excludes\_context gating [\#56](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/56) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.4.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.4.2a1) (2026-06-28)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.4.1a1...1.4.2a1)
