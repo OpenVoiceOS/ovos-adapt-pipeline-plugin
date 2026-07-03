@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 """An intent parsing service using the Adapt parser."""
+import time
 from functools import lru_cache
 from threading import Lock
 from typing import List, Optional, Iterable, Union, Dict
@@ -23,7 +24,7 @@ from ovos_bus_client.session import SessionManager
 from ovos_bus_client.util import get_message_lang
 from ovos_config.config import Configuration
 from ovos_plugin_manager.templates.pipeline import IntentHandlerMatch, ConfidenceMatcherPipeline
-from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage, gate_satisfied
+from ovos_spec_tools import closest_lang, standardize_lang, SpecMessage, gate_satisfied, is_live
 from ovos_utils import flatten_list
 from ovos_utils.fakebus import FakeBus
 from ovos_utils.log import LOG
@@ -47,6 +48,25 @@ def _entity_skill_id(skill_id):
     skill_id = skill_id.replace('.', '_')
     skill_id = skill_id.replace('-', '_')
     return skill_id
+
+
+class _InjectedContextManager:
+    """Adapt context source backed by ``session.intent_context`` (CONTEXT-1 §7).
+
+    Presents pre-match context candidates through the same ``get_context``
+    surface the legacy frame-stack :class:`~ovos_adapt.context.ContextManager`
+    exposes, so the adapt matcher consumes them exactly as it consumed legacy
+    ``from_context`` tags -- but sourced from the canonical intent-context map
+    rather than the frame stack. Each candidate is an entity dict of the shape
+    the parser and :meth:`Intent.validate_with_tags` expect.
+    """
+
+    def __init__(self, entities):
+        self._entities = entities
+
+    def get_context(self, *args, **kwargs):
+        # copies: the parser sorts and mutates the returned list in place.
+        return [dict(entity) for entity in self._entities]
 
 
 class AdaptPipeline(ConfidenceMatcherPipeline):
@@ -87,6 +107,13 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         # OVOS-CONTEXT-1 gate declarations, keyed by adapt intent label
         # (``skill_id:intent_name``): {'requires': [...], 'excludes': [...]}.
         self._context_gates: Dict[str, Dict] = {}
+
+        # OVOS-CONTEXT-1 §7 injection index, keyed by adapt intent label:
+        # {'skill_id': str, 'keywords': {vocab_name: adapt_entity_type}}. Maps
+        # each intent's declared keyword names to the entity_type its matcher
+        # requires, so a live context entry of that name can be injected as a
+        # candidate keyword before matching.
+        self._intent_keywords: Dict[str, Dict] = {}
 
         self._register_spec_handlers()
 
@@ -196,7 +223,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                 intents = [i for i in self.engines[lang].determine_intent(
                     utt, 100,
                     include_tags=True,
-                    context_manager=sess.context)
+                    context_manager=self._context_manager(sess))
                     if self._context_gate_ok(i, sess)]
                 if intents:
                     utt_best = max(
@@ -259,6 +286,91 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                               gate['requires'], gate['excludes'],
                               owner_id=skill_id)
 
+    @staticmethod
+    def _live_context_value(entries: Dict, name: str, skill_id: str,
+                            now: float) -> Optional[str]:
+        """Resolve a live non-null string context value for a keyword name.
+
+        Scope is read from the key (OVOS-CONTEXT-1 §3): the owner's private
+        entry ``<skill_id>:<name>`` is consulted first, then the shared bare
+        ``<name>``. Flag entries (``value`` null / non-string) and dead
+        entries are ignored.
+        """
+        for key in (f"{skill_id}:{name}", name):
+            entry = entries.get(key)
+            if not isinstance(entry, dict):
+                continue
+            value = entry.get("value")
+            if not isinstance(value, str) or not value:
+                continue
+            if not is_live(entry, now):
+                continue
+            return value
+        return None
+
+    def _context_candidate_entities(self, sess) -> List[Dict]:
+        """Build OVOS-CONTEXT-1 §7 pre-match candidate entities.
+
+        For every registered intent keyword that has a live non-null string
+        entry in ``session.intent_context`` (scope-resolved from the key),
+        emit an adapt context entity of that keyword's ``entity_type`` carrying
+        the entry value. The matcher then treats the value as it would a
+        keyword the utterance produced; an entity the utterance itself yields
+        for the same type is found first by ``_find_first_tag`` and wins.
+        """
+        entries = getattr(sess, "intent_context", None) or {}
+        if not entries or not self._intent_keywords:
+            return []
+        now = time.time()
+        seen = set()
+        candidates = []
+        for meta in self._intent_keywords.values():
+            skill_id = meta["skill_id"]
+            for name, entity_type in meta["keywords"].items():
+                value = self._live_context_value(entries, name, skill_id, now)
+                if value is None:
+                    continue
+                dedup = (entity_type, value)
+                if dedup in seen:
+                    continue
+                seen.add(dedup)
+                candidates.append({"key": value, "match": value,
+                                   "confidence": 1.0,
+                                   "data": [(value, entity_type)]})
+        return candidates
+
+    def _context_manager(self, sess) -> _InjectedContextManager:
+        """Context source for a match, sourced from ``session.intent_context``."""
+        return _InjectedContextManager(self._context_candidate_entities(sess))
+
+    def _record_intent_keywords(self, intent):
+        """Index an intent's declared keyword names for §7 injection.
+
+        Records every ``require`` / ``optional`` / ``one_of`` entity_type keyed
+        by the label's ``skill_id``. For legacy and in-process registrations
+        the keyword name is the entity_type itself; the OVOS-INTENT-4 keyword
+        handler overrides this with the un-namespaced vocabulary names.
+        """
+        name = getattr(intent, "name", None)
+        if not name:
+            return
+        keywords = {}
+        for entity_type, _attr in (list(getattr(intent, "requires", []) or []) +
+                                   list(getattr(intent, "optional", []) or [])):
+            keywords[entity_type] = entity_type
+        for group in getattr(intent, "at_least_one", []) or []:
+            for entity_type in group:
+                keywords[entity_type] = entity_type
+        skill_id = name.split(":", 1)[0] if ":" in name else name
+        self._intent_keywords[name] = {"skill_id": skill_id,
+                                       "keywords": keywords}
+
+    def _forget_intent_keywords(self, skill_id: str):
+        """Drop the §7 injection index entries owned by a detached skill."""
+        for label in [l for l, m in self._intent_keywords.items()
+                      if m["skill_id"] == skill_id]:
+            self._intent_keywords.pop(label, None)
+
     def register_vocabulary(self, entity_value: str, entity_type: str,
                             alias_of: str, regex_str: str, lang: str):
         """Register skill vocabulary as adapt entity.
@@ -290,6 +402,8 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         for lang in self.engines:
             with self.lock:
                 self.engines[lang].register_intent_parser(intent)
+        # OVOS-CONTEXT-1 §7 — index declared keywords for candidate injection.
+        self._record_intent_keywords(intent)
 
     def detach_skill(self, skill_id):
         """Remove all intents for skill.
@@ -306,6 +420,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                 self.engines[lang].drop_intent_parser(skill_parsers)
             self._detach_skill_keywords(skill_id)
             self._detach_skill_regexes(skill_id)
+        self._forget_intent_keywords(skill_id)
 
     def _detach_skill_keywords(self, skill_id):
         """Detach all keywords registered with a particular skill.
@@ -347,6 +462,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                 p for p in self.engines[lang].intent_parsers if p.name != intent_name
             ]
             self.engines[lang].intent_parsers = new_parsers
+        self._intent_keywords.pop(intent_name, None)
 
     def shutdown(self):
         for lang in self.engines:
@@ -575,9 +691,25 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                 builder.exclude(entity_type)
 
         self.register_intent(builder.build())
+        label = self._spec_intent_name(skill_id, intent_name)
+        # OVOS-CONTEXT-1 §7 — map the un-namespaced vocabulary names to the
+        # namespaced adapt entity_types so a context entry keyed by the bare
+        # name (e.g. ``person``) injects a candidate for this intent's keyword.
+        keyword_types = {}
+        for descriptor in list(required) + list(optional):
+            n = descriptor.get("name")
+            if n:
+                keyword_types[n] = self._spec_entity_type(skill_id, n)
+        for group in one_of:
+            for descriptor in group:
+                n = descriptor.get("name")
+                if n:
+                    keyword_types[n] = self._spec_entity_type(skill_id, n)
+        self._intent_keywords[label] = {"skill_id": skill_id,
+                                        "keywords": keyword_types}
         # OVOS-CONTEXT-1 §6 — the register payload MAY declare context gates.
         self._store_context_gate(
-            self._spec_intent_name(skill_id, intent_name),
+            label,
             data.get("requires_context"), data.get("excludes_context"))
 
     def handle_spec_register_entity(self, message):
@@ -726,6 +858,8 @@ class DomainAdaptPipeline(AdaptPipeline):
 
         # OVOS-CONTEXT-1 gate declarations, keyed by adapt intent label.
         self._context_gates: Dict[str, Dict] = {}
+        # OVOS-CONTEXT-1 §7 injection index (see AdaptPipeline.__init__).
+        self._intent_keywords: Dict[str, Dict] = {}
 
         self.bus.on('register_vocab', self.handle_register_vocab)
         self.bus.on('register_intent', self.handle_register_intent)
@@ -770,7 +904,7 @@ class DomainAdaptPipeline(AdaptPipeline):
         for sub in sub_engines:
             for it in sub.determine_intent(
                     utterance=utt, num_results=1, include_tags=True,
-                    context_manager=sess.context):
+                    context_manager=self._context_manager(sess)):
                 if self._context_gate_ok(it, sess):
                     candidates.append(it)
         return candidates
@@ -845,6 +979,8 @@ class DomainAdaptPipeline(AdaptPipeline):
             with self.lock:
                 self.engines[lang].register_intent_parser(intent, domain=domain)
                 self._entity_domain_index[lang][norm] = domain
+        # OVOS-CONTEXT-1 §7 — index declared keywords for candidate injection.
+        self._record_intent_keywords(intent)
 
     def register_vocabulary(self, entity_value: str, entity_type: str,
                             alias_of: str, regex_str: str, lang: str):
@@ -871,6 +1007,7 @@ class DomainAdaptPipeline(AdaptPipeline):
                 idx = self._entity_domain_index.get(lang, {})
                 for prefix in [p for p, d in idx.items() if d == skill_id]:
                     idx.pop(prefix, None)
+        self._forget_intent_keywords(skill_id)
 
     def detach_intent(self, intent_name):
         """Detach a single intent from its owning domain."""
@@ -882,6 +1019,7 @@ class DomainAdaptPipeline(AdaptPipeline):
                     sub = engine.domains[domain]
                     sub.intent_parsers = [p for p in sub.intent_parsers
                                           if p.name != intent_name]
+        self._intent_keywords.pop(intent_name, None)
 
     def shutdown(self):
         with self.lock:
@@ -917,5 +1055,5 @@ class HierarchicalAdaptPipeline(DomainAdaptPipeline):
         with self.lock:
             candidates = list(engine.determine_intent(
                 utterance=utt, num_results=1, include_tags=True,
-                context_manager=sess.context))
+                context_manager=self._context_manager(sess)))
         return [it for it in candidates if self._context_gate_ok(it, sess)]
