@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.0a1) (2026-07-03)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.5.0a1...1.6.0a1)
+
+**Merged pull requests:**
+
+- feat: OVOS-CONTEXT-1 §7 pre-match context injection \(keyword engine\) [\#58](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/58) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.5.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.5.0a1) (2026-07-02)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.4.2a1...1.5.0a1)
