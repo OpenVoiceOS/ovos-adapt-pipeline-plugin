@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 """An intent parsing service using the Adapt parser."""
+import re
 import time
 from functools import lru_cache
 from threading import Lock
@@ -487,6 +488,15 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         regex_str = message.data.get('regex')
         alias_of = message.data.get('alias_of')
         lang = get_message_lang(message)
+        # OVOS-INTENT-4 §6.3 — skip unusable registrations with a warning
+        # instead of crashing the executor: a payload must carry either a
+        # regex or a complete entity_value/entity_type keyword pair.
+        if not regex_str and (not entity_value or not entity_type):
+            LOG.warning(f"skipping malformed vocab registration "
+                        f"(topic={message.msg_type}, lang={lang}, "
+                        f"entity_type={entity_type}, entity_value={entity_value}): "
+                        f"missing entity_value/entity_type and no regex")
+            return
         self.register_vocabulary(entity_value, entity_type,
                                  alias_of, regex_str, lang)
         self.registered_vocab.append(message.data)
@@ -880,6 +890,10 @@ class DomainAdaptPipeline(AdaptPipeline):
         Falls back to the entity_type itself if no match is found.
         """
         index = self._entity_domain_index.get(lang, {})
+        if not entity_type:
+            # nothing to route by (e.g. a regex with no named group);
+            # fall back to the shared default domain
+            return 0
         # exact match first
         if entity_type in index:
             return index[entity_type]
@@ -987,6 +1001,12 @@ class DomainAdaptPipeline(AdaptPipeline):
         """Register skill vocabulary, routed by entity_type to a domain."""
         lang = self._get_closest_lang(lang)
         if lang is not None:
+            if regex_str and not entity_type:
+                # legacy regex payloads carry no entity_type; the named
+                # group is the entity_type (skill-id prefixed by the
+                # emitter), so route the regex to its owning domain by it
+                group = re.search(r"\(\?P<([^>]+)>", regex_str)
+                entity_type = group.group(1) if group else None
             with self.lock:
                 domain = self._resolve_entity_domain(lang, entity_type)
                 if regex_str:
