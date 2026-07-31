@@ -13,13 +13,13 @@ engine.register_entity("light", "LightKeyword")
 engine.register_entity("lamp", "LightKeyword")
 ```
 
-All three are type `LightKeyword`; an intent that requires `LightKeyword`
-matches if any one of them appears. Matching is exact and case-insensitive —
-register plurals, contractions, and synonyms explicitly.
+All three are type `LightKeyword`. An intent that requires `LightKeyword`
+matches if any one of them appears. Matching is exact and case-insensitive.
+Register plurals, contractions, and synonyms explicitly.
 
 ### Aliases
 
-`alias_of` records that one surface form should be reported as another — useful
+`alias_of` records that one surface form should be reported as another, useful
 when several spellings should resolve to one canonical value:
 
 ```python
@@ -53,7 +53,7 @@ command.
 
 Used when present, ignored when absent. An optional tag that *is* found raises
 the confidence (it explains more of the utterance) but never blocks a match.
-Use it for refinements — a room name, a media genre.
+Use it for refinements, a room name, a media genre.
 
 ### `one_of([entity_type, ...])`
 
@@ -83,7 +83,7 @@ IntentBuilder("media:play") \
 
 ## Regex entities
 
-For values you cannot enumerate — numbers, free text — register a regular
+For values you cannot enumerate, numbers, free text, register a regular
 expression with a named group. The group name becomes the entity type.
 
 ```python
@@ -91,7 +91,7 @@ engine.register_regex_entity(r"for (?P<Duration>\d+) minutes")
 ```
 
 A match on *"set a timer for 10 minutes"* produces a `Duration` tag with value
-`10`. Use regex entities for slots; keep `require`/`optionally` keywords for the
+`10`. Use regex entities for slots, and keep `require`/`optionally` keywords for the
 words that identify the command.
 
 ## A complete example
@@ -130,19 +130,22 @@ for intent in engine.determine_intent("switch on the kitchen lights"):
 ## Tips
 
 - **Name intents `skill_id:intent_name`.** OVOS routes a match back to the
-  skill by the `skill_id` prefix; the colon convention is expected.
+  skill by the `skill_id` prefix. The colon convention is expected.
 - **Multi-word keywords must be contiguous.** `"turn off"` is registered as one
   surface form and only tags when those words appear together. `"turn the
   lights off"` will *not* match the keyword `"turn off"`.
 - **More `require`d slots = a sharper, higher-confidence intent.** A
-  single-keyword intent fires on that lone word in any sentence; a two-slot
+  single-keyword intent fires on that lone word in any sentence. A two-slot
   intent demands a real command shape.
 - **Disambiguate overlapping intents** with `exclude`, not by hoping confidence
   sorts them out.
 
 ## In an OVOS skill
 
-Skills built with `ovos-workshop` do not call the engine directly — they
+Skills built with `ovos-workshop` do not call the engine directly, they
 register vocabulary and intents over the messagebus, and this plugin consumes
 those messages. The `IntentBuilder` API above is exactly what the skill side
 uses. See [Bus protocol](bus-protocol.md) for the message flow.
+
+---
+[← Quickstart](quickstart.md) · [Home](index.md) · [Configuration →](configuration.md)
