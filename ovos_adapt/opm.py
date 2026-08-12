@@ -39,13 +39,32 @@ from ovos_adapt.engine import (IntentDeterminationEngine,
 def _entity_skill_id(skill_id):
     """Helper converting a skill id to the format used in entities.
 
+    Normalizes a skill_id into the namespace prefix used for adapt
+    entity_types: ``.`` and ``-`` (illegal/ambiguous in that namespace)
+    are replaced with ``_``. This is byte-identical to the spelling
+    ovos-workshop's ``alphanumeric_skill_id`` produces for realistic
+    skill_ids, which is why every caller that registers, matches, or
+    detaches skill-owned entities/regexes goes through this helper --
+    it keeps the wire encoding consistent with the producer side.
+
+    The transform is NOT injective: distinct skill_ids can normalize to
+    the same string (``"foo-bar"`` and ``"foo.bar"`` both become
+    ``"foo_bar"``), and even when they don't collide outright, one
+    normalized id can be a prefix of another (``"foo_bar"`` / ``"foo_barz"``).
+    ``detach_skill`` therefore does NOT rely on this helper being
+    collision-free: it scopes detachment to the entity_types/regex groups
+    actually recorded as owned by the skill (ownership tracked at
+    registration time), falling back to a prefix match only for entries
+    whose owner was never recorded (e.g. registered before ownership
+    tracking existed, or via a bus message with no ``skill_id`` in its
+    context).
+
     Arguments:
         skill_id (str): skill identifier
 
     Returns:
         (str) skill id on the format used by skill entities
     """
-    skill_id = skill_id[:-1]
     skill_id = skill_id.replace('.', '_')
     skill_id = skill_id.replace('-', '_')
     return skill_id
@@ -90,6 +109,14 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         self.lock = Lock()
         self.registered_vocab = []
         self.max_words = 50  # if an utterance contains more words than this, don't attempt to match
+
+        # Ownership tracking for detach_skill (see _entity_skill_id docstring):
+        # skill_id -> set of entity_types / regex group names it registered.
+        # Populated at registration time from message.context["skill_id"];
+        # entries with no recorded owner fall back to a prefix match on
+        # detach, preserving pre-existing behaviour for those callers.
+        self._entity_owners: Dict[str, set] = {}
+        self._regex_owners: Dict[str, set] = {}
 
         # TODO sanitize config option
         self.conf_high = self.config.get("conf_high") or 0.65
@@ -373,7 +400,8 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             self._intent_keywords.pop(label, None)
 
     def register_vocabulary(self, entity_value: str, entity_type: str,
-                            alias_of: str, regex_str: str, lang: str):
+                            alias_of: str, regex_str: str, lang: str,
+                            skill_id: Optional[str] = None):
         """Register skill vocabulary as adapt entity.
 
         This will handle both regex registration and registration of normal
@@ -384,15 +412,26 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             entity_value: the natural langauge word
             entity_type: the type/tag of an entity instance
             alias_of: entity this is an alternative for
+            skill_id: owning skill, when known, used to scope
+                ``detach_skill`` to exactly this registration instead of a
+                collision-prone prefix match (see ``_entity_skill_id``).
         """
         lang = self._get_closest_lang(lang)
         if lang is not None:
             with self.lock:
                 if regex_str:
                     self.engines[lang].register_regex_entity(regex_str)
+                    if skill_id:
+                        group = re.search(r"\(\?P<([^>]+)>", regex_str)
+                        if group:
+                            self._regex_owners.setdefault(skill_id, set()).add(
+                                group.group(1))
                 else:
                     self.engines[lang].register_entity(
                         entity_value, entity_type, alias_of=alias_of)
+                    if skill_id and entity_type:
+                        self._entity_owners.setdefault(skill_id, set()).add(
+                            entity_type)
 
     def register_intent(self, intent):
         """Register new intent with adapt engine.
@@ -416,7 +455,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             for lang in self.engines:
                 skill_parsers = [
                     p.name for p in self.engines[lang].intent_parsers if
-                    p.name.startswith(skill_id)
+                    p.name.startswith(skill_id + ':')
                 ]
                 self.engines[lang].drop_intent_parser(skill_parsers)
             self._detach_skill_keywords(skill_id)
@@ -426,13 +465,34 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
     def _detach_skill_keywords(self, skill_id):
         """Detach all keywords registered with a particular skill.
 
+        Entity_types recorded as owned by ``skill_id`` (see
+        ``register_vocabulary``) are matched exactly. Entity_types with no
+        recorded owner at all (registered before ownership tracking, or via
+        a message whose context lacked ``skill_id``) fall back to the
+        legacy prefix match against the normalized skill_id. Entity_types
+        owned by a *different* skill are never touched, even if they share
+        the normalized-skill_id prefix.
+
         Arguments:
             skill_id (str): skill identifier
         """
-        skill_id = _entity_skill_id(skill_id)
+        owned = self._entity_owners.pop(skill_id, None)
+        all_owned = set()
+        for types in self._entity_owners.values():
+            all_owned |= types
+        if owned:
+            all_owned |= owned
+        prefix = _entity_skill_id(skill_id)
 
         def match_skill_entities(data):
-            return data and data[1].startswith(skill_id)
+            if not data:
+                return False
+            entity_type = data[1]
+            if owned and entity_type in owned:
+                return True
+            if entity_type in all_owned:
+                return False
+            return entity_type.startswith(prefix)
 
         for lang in self.engines:
             self.engines[lang].drop_entity(match_func=match_skill_entities)
@@ -440,14 +500,31 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
     def _detach_skill_regexes(self, skill_id):
         """Detach all regexes registered with a particular skill.
 
+        Mirrors ``_detach_skill_keywords``: regex group names recorded as
+        owned by ``skill_id`` are matched exactly; unowned group names fall
+        back to the legacy prefix match; group names owned by a different
+        skill are left alone.
+
         Arguments:
             skill_id (str): skill identifier
         """
-        skill_id = _entity_skill_id(skill_id)
+        owned = self._regex_owners.pop(skill_id, None)
+        all_owned = set()
+        for names in self._regex_owners.values():
+            all_owned |= names
+        if owned:
+            all_owned |= owned
+        prefix = _entity_skill_id(skill_id)
 
         def match_skill_regexes(regexp):
-            return any([r.startswith(skill_id)
-                        for r in regexp.groupindex.keys()])
+            for name in regexp.groupindex.keys():
+                if owned and name in owned:
+                    return True
+                if name in all_owned:
+                    continue
+                if name.startswith(prefix):
+                    return True
+            return False
 
         for lang in self.engines:
             self.engines[lang].drop_regex_entity(match_func=match_skill_regexes)
@@ -488,6 +565,10 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         regex_str = message.data.get('regex')
         alias_of = message.data.get('alias_of')
         lang = get_message_lang(message)
+        # ownership for detach_skill scoping (see register_vocabulary);
+        # ovos-workshop sets this in message.context for both the legacy
+        # register_vocab path and the INTENT-4 path.
+        skill_id = message.context.get("skill_id") if message.context else None
         # OVOS-INTENT-4 §6.3 — skip unusable registrations with a warning
         # instead of crashing the executor: a payload must carry either a
         # regex or a complete entity_value/entity_type keyword pair.
@@ -498,7 +579,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                         f"missing entity_value/entity_type and no regex")
             return
         self.register_vocabulary(entity_value, entity_type,
-                                 alias_of, regex_str, lang)
+                                 alias_of, regex_str, lang, skill_id=skill_id)
         self.registered_vocab.append(message.data)
 
     def handle_register_intent(self, message):
@@ -632,7 +713,8 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         for sample in samples:
             if not sample:
                 continue
-            self.register_vocabulary(sample, entity_type, None, None, lang)
+            self.register_vocabulary(sample, entity_type, None, None, lang,
+                                     skill_id=skill_id)
             self.registered_vocab.append({"entity_value": sample,
                                           "entity_type": entity_type})
         return entity_type
@@ -988,7 +1070,7 @@ class DomainAdaptPipeline(AdaptPipeline):
         domain = _domain_from_intent_name(intent.name)
         # Track entity_type prefix -> domain so vocab registrations can
         # be routed to the same engine.
-        norm = _entity_skill_id(domain + ".")  # mimic skill_id formatting
+        norm = _entity_skill_id(domain)
         for lang in self.engines:
             with self.lock:
                 self.engines[lang].register_intent_parser(intent, domain=domain)
@@ -997,8 +1079,17 @@ class DomainAdaptPipeline(AdaptPipeline):
         self._record_intent_keywords(intent)
 
     def register_vocabulary(self, entity_value: str, entity_type: str,
-                            alias_of: str, regex_str: str, lang: str):
-        """Register skill vocabulary, routed by entity_type to a domain."""
+                            alias_of: str, regex_str: str, lang: str,
+                            skill_id: Optional[str] = None):
+        """Register skill vocabulary, routed by entity_type to a domain.
+
+        ``skill_id`` is accepted for interface parity with
+        :meth:`AdaptPipeline.register_vocabulary` (callers such as
+        ``handle_register_vocab`` pass it unconditionally) but is unused
+        here: this pipeline already scopes ``detach_skill`` by dropping the
+        exact-keyed domain, so the prefix-collision ownership tracking that
+        the flat :class:`AdaptPipeline` needs doesn't apply.
+        """
         lang = self._get_closest_lang(lang)
         if lang is not None:
             if regex_str and not entity_type:
