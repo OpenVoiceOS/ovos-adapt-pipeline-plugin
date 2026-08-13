@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.3a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.2a1...1.6.3a1)
+
+**Merged pull requests:**
+
+- fix: probe un-munged legacy keyword names for §7 context lookup [\#67](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/67) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.6.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.2a1) (2026-08-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.1a1...1.6.2a1)
