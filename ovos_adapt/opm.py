@@ -315,16 +315,66 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                               owner_id=skill_id)
 
     @staticmethod
-    def _live_context_value(entries: Dict, name: str, skill_id: str,
-                            now: float) -> Optional[str]:
-        """Resolve a live non-null string context value for a keyword name.
+    def _unmunge_keyword_name(entity_type: str, skill_id: str) -> str:
+        """Recover the plain vocabulary name from a legacy-munged entity_type.
 
-        Scope is read from the key (OVOS-CONTEXT-1 §3): the owner's private
-        entry ``<skill_id>:<name>`` is consulted first, then the shared bare
-        ``<name>``. Flag entries (``value`` null / non-string) and dead
-        entries are ignored.
+        ``ovos-workshop``'s ``_AdaptIntentApi.munge_intent_parser`` prefixes
+        legacy ``require``/``optional``/``at_least_one`` entity_types with
+        ``to_alnum(skill_id)`` (non-alphanumeric characters replaced by
+        ``_``). This mirrors that transform in reverse, used only to build
+        an *additional* fallback probe in :meth:`_live_context_value` --
+        some call sites write the session's ``intent_context`` key with the
+        raw plain name (e.g. ``SessionManager.get(msg).set_intent_context
+        ("prev_dialog", ...)``) instead of going through
+        ``OVOSSkill.set_context`` (which munges). Returns the entity_type
+        unchanged when it does not carry the prefix, or when stripping the
+        prefix would leave an empty string (an empty lookup key can never
+        usefully match).
         """
-        for key in (f"{skill_id}:{name}", name):
+        prefix = ''.join(c if c.isalnum() else '_' for c in str(skill_id))
+        if prefix and entity_type.startswith(prefix):
+            stripped = entity_type[len(prefix):]
+            if stripped:
+                return stripped
+        return entity_type
+
+    @classmethod
+    def _live_context_value(cls, entries: Dict, name: str, skill_id: str,
+                            now: float) -> Optional[str]:
+        """Resolve a live string context value for a keyword name.
+
+        Two producers write ``session.intent_context`` under different key
+        shapes for the same keyword, so both are probed:
+
+        - ``OVOSSkill.set_context``/legacy ``add_context`` munges the key
+          (``to_alnum(skill_id) + name``), matching the keyword's
+          (already-munged) ``entity_type`` directly.
+        - Raw ``SessionManager.get(msg).set_intent_context(name, ...)``
+          writes the plain, un-munged ``name`` -- used e.g. by
+          days-in-history's context-only keywords.
+
+        For each shape, scope is read from the key (OVOS-CONTEXT-1 §3): the
+        owner's private entry ``<skill_id>:<key>`` is consulted before the
+        shared bare ``<key>``. The plain-name probes are skipped when
+        unmunging is a no-op (nothing to strip), to avoid a redundant
+        duplicate lookup. Null-valued (``value=None``) and empty-string
+        (``value=""``) entries are ignored as non-injectable flags -- the
+        ``requires_context``/``excludes_context`` gating contract -- along
+        with any other non-string entry: they gate only, never inject.
+
+        Trade-off accepted by the plain-name fallback: a shared-scope entry
+        written under the un-munged plain name fills ANY legacy skill's
+        private keyword of that same name, so generic names (``prev_dialog``,
+        ``date``, ``person``, ``sleeping_state``) are effectively global
+        across skills rather than namespaced -- acceptable because it only
+        ever adds a probe, never replaces the primary (munged, per-skill)
+        lookup.
+        """
+        plain_name = cls._unmunge_keyword_name(name, skill_id)
+        probes = [f"{skill_id}:{name}", name]
+        if plain_name != name:
+            probes += [f"{skill_id}:{plain_name}", plain_name]
+        for key in probes:
             entry = entries.get(key)
             if not isinstance(entry, dict):
                 continue
