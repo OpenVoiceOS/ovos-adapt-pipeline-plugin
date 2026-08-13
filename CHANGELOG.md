@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.2a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.1a1...1.6.2a1)
+
+**Merged pull requests:**
+
+- fix: stop truncating final character of skill\_id in adapt entity naming [\#63](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/63) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.6.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.1a1) (2026-07-16)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.0a1...1.6.1a1)
