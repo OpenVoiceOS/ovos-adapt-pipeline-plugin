@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.3a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a2) (2026-09-01)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.3a1...1.6.3a2)
+
+**Merged pull requests:**
+
+- docs: rewrite README in Simplified Technical English [\#62](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/62) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.6.3a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a1) (2026-08-13)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.2a1...1.6.3a1)
