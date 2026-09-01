@@ -1,12 +1,148 @@
 # Changelog
 
-## [1.0.9a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.0.9a1) (2025-11-05)
+## [1.6.3a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a2) (2026-09-01)
 
-[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.0.8...1.0.9a1)
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.3a1...1.6.3a2)
 
 **Merged pull requests:**
 
-- Update requirements.txt [\#28](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/28) ([JarbasAl](https://github.com/JarbasAl))
+- docs: rewrite README in Simplified Technical English [\#62](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/62) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.6.3a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.2a1...1.6.3a1)
+
+**Merged pull requests:**
+
+- fix: probe un-munged legacy keyword names for §7 context lookup [\#67](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/67) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.6.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.2a1) (2026-08-13)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.1a1...1.6.2a1)
+
+**Merged pull requests:**
+
+- fix: stop truncating final character of skill\_id in adapt entity naming [\#63](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/63) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.6.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.1a1) (2026-07-16)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.0a1...1.6.1a1)
+
+**Merged pull requests:**
+
+- fix: never crash on partial register\_vocab payloads [\#60](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/60) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.6.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.0a1) (2026-07-03)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.5.0a1...1.6.0a1)
+
+**Merged pull requests:**
+
+- feat: OVOS-CONTEXT-1 §7 pre-match context injection \(keyword engine\) [\#58](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/58) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.5.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.5.0a1) (2026-07-02)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.4.2a1...1.5.0a1)
+
+**Merged pull requests:**
+
+- feat: enforce OVOS-CONTEXT-1 requires\_context/excludes\_context gating [\#56](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/56) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.4.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.4.2a1) (2026-06-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.4.1a1...1.4.2a1)
+
+**Merged pull requests:**
+
+- fix: lift ovos-spec-tools upper bound \(spec-tools 1.x\) [\#53](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/53) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.4.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.4.1a1) (2026-06-28)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.4.0a1...1.4.1a1)
+
+**Merged pull requests:**
+
+- fix: default config value [\#30](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/30) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.4.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.4.0a1) (2026-06-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.4a1...1.4.0a1)
+
+**Merged pull requests:**
+
+- feat: consume OVOS-INTENT-4 keyword registration \(alongside legacy\) [\#44](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/44) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.3.4a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.4a1) (2026-06-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.3a1...1.3.4a1)
+
+**Merged pull requests:**
+
+- fix: accept foreign \(ovos-spec-tools / ovos-workshop\) Intents at registration [\#48](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/48) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.3.3a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.3a1) (2026-06-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.2a1...1.3.3a1)
+
+**Merged pull requests:**
+
+- fix: guard None session blacklists in intent match filters [\#47](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/47) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.3.2a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.2a1) (2026-06-27)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.1a1...1.3.2a1)
+
+**Merged pull requests:**
+
+- fix\(deps\): allow ovos-workshop 9.x \(widen \<9.0.0 -\> \<10.0.0\) [\#45](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/45) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.3.1a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.1a1) (2026-05-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.3.0a1...1.3.1a1)
+
+**Merged pull requests:**
+
+- fix: bucket engines by full BCP-47 tag, migrate to ovos-spec-tools [\#42](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/42) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.3.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.3.0a1) (2026-05-22)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.2.0a2...1.3.0a1)
+
+**Merged pull requests:**
+
+- feat: HierarchicalIntentDeterminationEngine  [\#37](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/37) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.2.0a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.2.0a2) (2026-05-22)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.2.0a1...1.2.0a2)
+
+**Merged pull requests:**
+
+- docs: zero-to-hero documentation guide [\#39](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/39) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.2.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.2.0a1) (2026-05-21)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.1.0a1...1.2.0a1)
+
+**Merged pull requests:**
+
+- feat: expand OVOS template syntax in vocab entries [\#36](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/36) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.1.0a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.1.0a1) (2026-05-14)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.0.10a2...1.1.0a1)
+
+**Merged pull requests:**
+
+- feat\(test\): ovoscope end-to-end tests for AdaptPipeline [\#34](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/34) ([JarbasAl](https://github.com/JarbasAl))
+
+## [1.0.10a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.0.10a2) (2026-04-09)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.0.9...1.0.10a2)
+
+**Merged pull requests:**
+
+- chore\(ovos\_adapt\_parser\): allow ovos-workshop\<9.0.0 [\#32](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/32) ([JarbasAl](https://github.com/JarbasAl))
 
 
 
