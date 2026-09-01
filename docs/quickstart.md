@@ -3,14 +3,14 @@
 ## Install
 
 ```bash
-pip install ovos-adapt-pipeline-plugin
+pip install ovos-adapt-parser
 ```
 
 This pulls in the OVOS pipeline plugin and the bundled adapt parser.
 
 ## Match an utterance with the engine directly
 
-The adapt parser works standalone — no OVOS, no messagebus. This is the fastest
+The adapt parser works standalone, no OVOS, no messagebus. This is the fastest
 way to see it work and the best way to prototype intents.
 
 ```python
@@ -52,7 +52,7 @@ Output (abridged):
 ```
 
 `determine_intent` yields one result per clique, best first. Filter on
-`confidence > 0` — a zero score means a required slot was missing.
+`confidence > 0`, a zero score means a required slot was missing.
 
 More runnable examples ship in the [`examples/`](../examples) folder.
 
@@ -76,12 +76,15 @@ id to the pipeline list in `mycroft.conf`:
 
 The `-high` / `-medium` / `-low` suffixes select the confidence tier for that
 slot in the pipeline (see [Configuration](configuration.md)). Skills then
-register their vocabulary and intents over the messagebus; the plugin matches
-incoming utterances automatically. You do not call the engine yourself — see
+register their vocabulary and intents over the messagebus. The plugin matches
+incoming utterances automatically. You do not call the engine yourself, see
 [Bus protocol](bus-protocol.md) for what happens under the hood.
 
 ## Next
 
-- [Writing intents](writing-intents.md) — `require` / `optionally` / `one_of` /
+- [Writing intents](writing-intents.md), `require` / `optionally` / `one_of` /
   `exclude`, regex entities, and full examples.
-- [Configuration](configuration.md) — tune the confidence thresholds.
+- [Configuration](configuration.md), tune the confidence thresholds.
+
+---
+[← Concepts](concepts.md) · [Home](index.md) · [Writing intents →](writing-intents.md)

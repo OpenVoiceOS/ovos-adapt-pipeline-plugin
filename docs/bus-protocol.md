@@ -1,8 +1,8 @@
 # Bus protocol
 
 In a full OVOS install the plugin is driven entirely over the messagebus.
-Skills emit registration messages; the plugin matches utterances and emits
-results. This page documents that contract — useful when writing a skill
+Skills emit registration messages. The plugin matches utterances and emits
+results. This page documents that contract, useful when writing a skill
 framework, debugging, or integrating a non-standard skill.
 
 ## Registration messages (skill → plugin)
@@ -33,12 +33,12 @@ plugin reconstructs the parser and adds it to the engine.
 
 ### `detach_intent`
 
-Removes a single intent. `message.data['intent_name']` — the intent's name.
+Removes a single intent. `message.data['intent_name']`, the intent's name.
 
 ### `detach_skill`
 
 Removes every intent and vocab item belonging to a skill.
-`message.data['skill_id']` — all intents whose name starts with that prefix are
+`message.data['skill_id']`, all intents whose name starts with that prefix are
 dropped. Emitted when a skill unloads.
 
 ## Query messages
@@ -73,15 +73,18 @@ intent service, which calls the tier methods (`match_high`, `match_medium`,
 
 A match is an `IntentHandlerMatch` carrying:
 
-- `match_type` — the intent name (`skill_id:intent_name`)
-- `match_data` — the parsed intent dict: `confidence`, every matched slot keyed
+- `match_type`, the intent name (`skill_id:intent_name`)
+- `match_data`, the parsed intent dict: `confidence`, every matched slot keyed
   by entity type, and `__tags__` (the raw tags, used for context)
-- `skill_id` — the owning skill, taken from the intent-name prefix
-- `utterance` — the utterance that matched
+- `skill_id`, the owning skill, taken from the intent-name prefix
+- `utterance`, the utterance that matched
 
 ## Sessions and context
 
 Each match updates the `Session` context with the entities it consumed.
 A later utterance can then satisfy a `require`d slot from context instead of
-from its own words — this is how follow-up commands ("...and the bedroom one
-too") resolve. Context is per-session; see [Internals](internals.md).
+from its own words, this is how follow-up commands ("...and the bedroom one
+too") resolve. Context is per-session. See [Internals](internals.md).
+
+---
+[← Pipeline variants](pipelines.md) · [Home](index.md) · [Internals →](internals.md)

@@ -2,7 +2,7 @@
 
 ## Entry points
 
-The package publishes three OPM `opm.pipeline` entry points — the flat plugin
+The package publishes three OPM `opm.pipeline` entry points, the flat plugin
 and two domain-organised variants:
 
 ```toml
@@ -13,8 +13,8 @@ and two domain-organised variants:
 ```
 
 OVOS discovers each by its id. This page covers the flat
-`ovos-adapt-pipeline-plugin`; the variants behave the same way and accept the
-same keys in their own config sections — see [Pipeline variants](pipelines.md).
+`ovos-adapt-pipeline-plugin`. The variants behave the same way and accept the
+same keys in their own config sections, see [Pipeline variants](pipelines.md).
 
 ## Enabling it in the pipeline
 
@@ -49,7 +49,7 @@ its confidence clears the tier threshold:
 | medium | `match_medium` | 0.45 | `conf_med` |
 | low | `match_low` | 0.25 | `conf_low` |
 
-The same utterance is scored once; the tier only decides which threshold the
+The same utterance is scored once. The tier only decides which threshold the
 score must clear. Lower a threshold to let weaker matches through that tier;
 raise it to demand a stronger match.
 
@@ -62,7 +62,7 @@ raise it to demand a stronger match.
 | `conf_low` | `0.25` | minimum confidence for a `match_low` result |
 | `max_words` | `50` | utterances longer than this are skipped unmatched |
 
-Keep the thresholds ordered `conf_low <= conf_med <= conf_high`; an inverted
+Keep the thresholds ordered `conf_low <= conf_med <= conf_high`. An inverted
 order makes a tier unreachable.
 
 `max_words` is a guard: very long utterances are rarely commands and are
@@ -70,13 +70,16 @@ expensive to expand into cliques, so they are dropped before matching.
 
 ## Tuning
 
-- **Too many false matches** (the assistant acts on off-hand remarks) — raise
+- **Too many false matches** (the assistant acts on off-hand remarks), raise
   `conf_high`, or give the over-eager intents more `require`d slots so they
   demand a fuller command. See [Concepts](concepts.md).
-- **Real commands missed** — check the utterance actually contains a registered
-  surface form for every required slot; confidence cannot rescue a missing
+- **Real commands missed**, check the utterance actually contains a registered
+  surface form for every required slot. Confidence cannot rescue a missing
   `require`. Lowering `conf_low` only helps if the intent scored *something*.
-- **Confidence feels low on correct matches** — short keywords in long
+- **Confidence feels low on correct matches**, short keywords in long
   sentences score low by design (little of the utterance is covered). Register
   longer, more specific surface forms, or add `optionally` slots that cover
   more words.
+
+---
+[← Writing intents](writing-intents.md) · [Home](index.md) · [Pipeline variants →](pipelines.md)
