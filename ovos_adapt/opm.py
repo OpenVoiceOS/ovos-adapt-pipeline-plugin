@@ -70,6 +70,53 @@ def _entity_skill_id(skill_id):
     return skill_id
 
 
+def _skill_id_from_context(message, handler: str) -> Optional[str]:
+    """Resolve the producing skill id per OVOS-INTENT-4 §3.2.
+
+    ``message.context["skill_id"]`` is the authoritative attribution of the
+    producing component. A payload ``skill_id`` that differs from it is
+    logged and ignored; it is never used to override the context.
+
+    Args:
+        message: the incoming bus message
+        handler: name of the calling handler, for the warning message
+
+    Returns:
+        The skill id from the context, or ``None`` if it is missing.
+    """
+    skill_id = message.context.get("skill_id") if message.context else None
+    payload_skill_id = message.data.get("skill_id")
+    if payload_skill_id and skill_id and payload_skill_id != skill_id:
+        LOG.warning(f"[{handler}] message.data['skill_id']={payload_skill_id!r} "
+                    f"differs from message.context['skill_id']={skill_id!r}; "
+                    f"using the context value per OVOS-INTENT-4 §3.2")
+    return skill_id
+
+
+def _target_skill_id_from_payload(message, handler: str) -> Optional[str]:
+    """Resolve the target skill id for ``ovos.intent.enable``/``disable``.
+
+    OVOS-INTENT-4 §3.2 exempts these two topics from the identity check:
+    they are control messages, not ownership claims. The payload
+    ``skill_id`` names the target skill whose intent is suppressed or
+    re-armed, while ``context.skill_id`` names the source issuing the
+    control, and the two MAY differ (cross-skill control).
+
+    Args:
+        message: the incoming bus message
+        handler: name of the calling handler, for the debug message
+
+    Returns:
+        The skill id from the payload, or ``None`` if it is missing.
+    """
+    skill_id = message.data.get("skill_id")
+    source_id = message.context.get("skill_id") if message.context else None
+    if skill_id and source_id and source_id != skill_id:
+        LOG.debug(f"[{handler}] cross-skill control: source={source_id!r} "
+                  f"target={skill_id!r} (OVOS-INTENT-4 §3.2)")
+    return skill_id
+
+
 class _InjectedContextManager:
     """Adapt context source backed by ``session.intent_context`` (CONTEXT-1 §7).
 
@@ -630,10 +677,17 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         regex_str = message.data.get('regex')
         alias_of = message.data.get('alias_of')
         lang = get_message_lang(message)
-        # ownership for detach_skill scoping (see register_vocabulary);
-        # ovos-workshop sets this in message.context for both the legacy
-        # register_vocab path and the INTENT-4 path.
-        skill_id = message.context.get("skill_id") if message.context else None
+        # OVOS-INTENT-4 §3.1/§3.2 — a registration without an owning
+        # skill_id in the context is malformed: registering it anyway
+        # with owner None means detach_skill can never remove it, so a
+        # word a skill registered outlives that skill's detach and can be
+        # matched by an unrelated later intent that happens to require
+        # the same entity_type/keyword.
+        skill_id = _skill_id_from_context(message, "handle_register_vocab")
+        if not skill_id:
+            LOG.warning(f"[handle_register_vocab] rejected: missing "
+                        f"message.context['skill_id']")
+            return
         # OVOS-INTENT-4 §6.3 — skip unusable registrations with a warning
         # instead of crashing the executor: a payload must carry either a
         # regex or a complete entity_value/entity_type keyword pair.
@@ -676,7 +730,11 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         Args:
             message (Message): message containing intent info
         """
-        skill_id = message.data.get('skill_id')
+        skill_id = _skill_id_from_context(message, "handle_detach_skill")
+        if not skill_id:
+            LOG.warning("[handle_detach_skill] rejected: missing "
+                        "message.context['skill_id']")
+            return
         self.detach_skill(skill_id)
 
     def handle_get_adapt(self, message: Message):
@@ -796,7 +854,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         - ``excluded[]``  -> register_entity(name) + .exclude(name)
         """
         data = message.data
-        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        skill_id = _skill_id_from_context(message, "handle_spec_register_keyword")
         intent_name = data.get("intent_name")
         lang = standardize_lang(data.get("lang") or get_message_lang(message))
 
@@ -876,7 +934,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         ``samples`` entry is a slot-free value (INTENT-1 §5.4).
         """
         data = message.data
-        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        skill_id = _skill_id_from_context(message, "handle_spec_register_entity")
         entity_name = data.get("entity_name")
         lang = standardize_lang(data.get("lang") or get_message_lang(message))
         samples = data.get("samples") or []
@@ -891,7 +949,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
     def handle_spec_deregister_intent(self, message):
         """Consume ``ovos.intent.deregister`` (INTENT-4 §8.2)."""
         data = message.data
-        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        skill_id = _skill_id_from_context(message, "handle_spec_deregister_intent")
         intent_name = data.get("intent_name")
         if not skill_id or not intent_name:
             return
@@ -900,7 +958,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
     def handle_spec_deregister_entity(self, message):
         """Consume ``ovos.entity.deregister`` (INTENT-4 §8.3)."""
         data = message.data
-        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        skill_id = _skill_id_from_context(message, "handle_spec_deregister_entity")
         entity_name = data.get("entity_name")
         if not skill_id or not entity_name:
             return
@@ -916,7 +974,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
     def handle_spec_deregister_skill(self, message):
         """Consume ``ovos.skill.deregister`` (INTENT-4 §8.4)."""
         data = message.data
-        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        skill_id = _skill_id_from_context(message, "handle_spec_deregister_skill")
         if not skill_id:
             return
         self.detach_skill(skill_id)
@@ -928,7 +986,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         candidacy without losing its registration.
         """
         data = message.data
-        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        skill_id = _target_skill_id_from_payload(message, "handle_spec_disable_intent")
         intent_name = data.get("intent_name")
         if not skill_id or not intent_name:
             return
@@ -942,7 +1000,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
     def handle_spec_enable_intent(self, message):
         """Consume ``ovos.intent.enable`` (INTENT-4 §8.5)."""
         data = message.data
-        skill_id = message.context.get("skill_id") or data.get("skill_id")
+        skill_id = _target_skill_id_from_payload(message, "handle_spec_enable_intent")
         intent_name = data.get("intent_name")
         if not skill_id or not intent_name:
             return

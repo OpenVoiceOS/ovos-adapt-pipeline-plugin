@@ -21,9 +21,10 @@ from ovos_adapt.engine import DomainIntentDeterminationEngine
 from ovos_adapt.opm import DomainAdaptPipeline
 
 
-def _vocab_msg(keyword, value):
+def _vocab_msg(keyword, value, skill_id):
     return Message('register_vocab',
-                   {'entity_value': value, 'entity_type': keyword})
+                   {'entity_value': value, 'entity_type': keyword},
+                   {'skill_id': skill_id})
 
 
 class TestDomainAdaptPipeline(TestCase):
@@ -46,9 +47,9 @@ class TestDomainAdaptPipeline(TestCase):
             Message('register_intent', intent_b.__dict__))
 
         self.pipeline.handle_register_vocab(
-            _vocab_msg('weather_skillWeatherKeyword', 'weather'))
+            _vocab_msg('weather_skillWeatherKeyword', 'weather', 'weather.skill'))
         self.pipeline.handle_register_vocab(
-            _vocab_msg('music_skillPlayKeyword', 'play'))
+            _vocab_msg('music_skillPlayKeyword', 'play', 'music.skill'))
 
     def test_engine_is_domain_engine(self):
         for engine in self.pipeline.engines.values():

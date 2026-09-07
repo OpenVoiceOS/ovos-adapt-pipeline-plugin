@@ -23,7 +23,8 @@ from ovos_adapt.opm import AdaptPipeline
 def create_vocab_msg(keyword, value):
     """Create a message for registering an adapt keyword."""
     return Message('register_vocab',
-                   {'entity_value': value, 'entity_type': keyword})
+                   {'entity_value': value, 'entity_type': keyword},
+                   {'skill_id': 'skill'})
 
 
 def get_last_message(bus):
@@ -97,7 +98,8 @@ class TestPipeline(TestCase):
         """Check that a removed skill's intent doesn't match."""
         # Check that no intent is matched
         msg = Message('detach_intent',
-                      data={'skill_id': 'skill'})
+                      data={'skill_id': 'skill'},
+                      context={'skill_id': 'skill'})
         self.adapt_pipeline.handle_detach_skill(msg)
         msg = Message('intent.service.adapt.get', data={'utterance': 'test'})
         self.adapt_pipeline.handle_get_adapt(msg)

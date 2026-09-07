@@ -56,6 +56,14 @@ class _Intent4AdaptHarness(E2EPipelineHarness):
 
     def setUp(self):
         super().setUp()
+        # ovoscope.E2EPipelineHarness.setUp() emits its per-test isolation
+        # "detach_skill" with no message.context["skill_id"], which
+        # OVOS-INTENT-4 §3.2 requires as the authoritative attribution;
+        # redo it here with the context set so isolation between tests in
+        # this TestCase still works.
+        from ovos_bus_client.message import Message
+        self.bus.emit(Message("detach_skill", {"skill_id": self.SKILL_ID},
+                              {"skill_id": self.SKILL_ID}))
         # Adapt realises §8.5 disable by mutating the *session* blacklist, and
         # the no-session path resolves to the shared SessionManager.default_
         # session singleton — its blacklist leaks across tests. Reset it so a
@@ -145,11 +153,19 @@ class TestLegacyStillConsumed(_Intent4AdaptHarness):
     still matches alongside the spec topic (memory: handlers run *in addition*)."""
 
     def test_legacy_keyword_registration_still_matches(self):
-        from ovoscope import register_adapt_intent, register_adapt_vocab
+        from ovoscope import register_adapt_intent
         from ovos_workshop.intents import IntentBuilder
 
-        register_adapt_vocab(self.bus, f"{self.SKILL_ID}:TurnOff", ["off"])
-        register_adapt_vocab(self.bus, f"{self.SKILL_ID}:Light", ["lights"])
+        # ovoscope.register_adapt_vocab() does not set
+        # message.context["skill_id"] (OVOS-INTENT-4 §3.2), so it is
+        # bypassed here in favour of a direct emit that does. Temporary
+        # until ovoscope#185 releases a fixed harness.
+        for entity_type, word in ((f"{self.SKILL_ID}:TurnOff", "off"),
+                                  (f"{self.SKILL_ID}:Light", "lights")):
+            self.bus.emit(Message("register_vocab", {
+                "entity_value": word, "entity_type": entity_type,
+                "lang": "en-US",
+            }, {"skill_id": self.SKILL_ID}))
         register_adapt_intent(
             self.bus,
             IntentBuilder(f"{self.SKILL_ID}:lights_off")
