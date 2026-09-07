@@ -45,8 +45,8 @@ class _AdaptHarness(E2EPipelineHarness):
     def _vocab(self, name, words):
         self._register_vocab(f"{self.SKILL_ID}:{name}", words, self.SKILL_ID)
 
-    def _intent(self, builder):
-        register_adapt_intent(self.bus, builder)
+    def _intent(self, builder, skill_id=None):
+        register_adapt_intent(self.bus, builder, skill_id=skill_id or self.SKILL_ID)
 
     def _detach_skill(self, skill_id):
         # ovoscope.detach_skill() does not set message.context["skill_id"]
@@ -177,7 +177,7 @@ class TestDetach(_AdaptHarness):
         )
         self.assertIsNotNone(msg)
 
-        detach_intent(self.bus, f"{self.SKILL_ID}:lights_off")
+        detach_intent(self.bus, f"{self.SKILL_ID}:lights_off", skill_id=self.SKILL_ID)
         self.expect_no_match("turn off the lights")
 
     def test_detach_skill_removes_all_its_intents(self):
@@ -201,6 +201,7 @@ class TestDetach(_AdaptHarness):
             IntentBuilder("skill_b_adapt:play_music")
             .require("skill_b_adapt:Play")
             .require("skill_b_adapt:Music"),
+            skill_id="skill_b_adapt",
         )
 
         self._detach_skill(self.SKILL_ID)
