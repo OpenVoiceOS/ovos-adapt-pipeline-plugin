@@ -127,7 +127,8 @@ class TestIntent4KeywordRegistration(TestCase):
         from ovos_adapt.intent import IntentBuilder
         self.pipeline.handle_register_vocab(
             Message("register_vocab",
-                    {"entity_value": "test", "entity_type": "testKeyword"}))
+                    {"entity_value": "test", "entity_type": "testKeyword"},
+                    {"skill_id": "skill"}))
         self.pipeline.handle_register_intent(
             Message("register_intent",
                     IntentBuilder("skill:testIntent").require("testKeyword").__dict__))

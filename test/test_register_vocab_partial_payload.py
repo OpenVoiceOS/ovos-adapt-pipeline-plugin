@@ -43,7 +43,8 @@ class RegexVocabWithoutEntityTypeTest(TestCase):
         # exact legacy regex payload shape: no entity_type/entity_value
         pipeline.handle_register_vocab(
             Message('register_vocab',
-                    {'regex': r'to (?P<nav_skillLocation>.*)'}))
+                    {'regex': r'to (?P<nav_skillLocation>.*)'},
+                    {'skill_id': 'nav.skill'}))
         engine = pipeline.engines[pipeline.lang]
         # routed to the owning skill's domain via the regex group name
         self.assertIn(r'to (?P<nav_skillLocation>.*)',
@@ -54,7 +55,8 @@ class RegexVocabWithoutEntityTypeTest(TestCase):
         _register_nav_intent(pipeline)
         pipeline.handle_register_vocab(
             Message('register_vocab',
-                    {'regex': r'to (?P<nav_skillLocation>.*)'}))
+                    {'regex': r'to (?P<nav_skillLocation>.*)'},
+                    {'skill_id': 'nav.skill'}))
         engine = pipeline.engines[pipeline.lang]
         self.assertIn(r'to (?P<nav_skillLocation>.*)',
                       engine.domains['nav.skill']._regex_strings)
@@ -71,10 +73,12 @@ class RegexVocabWithoutEntityTypeTest(TestCase):
         _register_nav_intent(pipeline)
         pipeline.handle_register_vocab(
             Message('register_vocab',
-                    {'entity_value': 'go', 'entity_type': 'nav_skillGoKeyword'}))
+                    {'entity_value': 'go', 'entity_type': 'nav_skillGoKeyword'},
+                    {'skill_id': 'nav.skill'}))
         pipeline.handle_register_vocab(
             Message('register_vocab',
-                    {'regex': r'go to (?P<nav_skillLocation>.*)'}))
+                    {'regex': r'go to (?P<nav_skillLocation>.*)'},
+                    {'skill_id': 'nav.skill'}))
         result = pipeline.match_intent(('go to lisbon',), pipeline.lang)
         self.assertIsNotNone(result)
         self.assertEqual(result.match_type, 'nav.skill:NavIntent')

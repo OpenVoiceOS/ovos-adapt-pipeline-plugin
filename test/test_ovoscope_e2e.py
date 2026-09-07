@@ -14,12 +14,11 @@ ovoscope = pytest.importorskip("ovoscope", reason="ovoscope not installed; skipp
 from ovoscope import (  # noqa: E402
     E2EPipelineHarness,
     detach_intent,
-    detach_skill,
     make_session,
     register_adapt_intent,
-    register_adapt_vocab,
 )
 from ovos_adapt.intent import IntentBuilder  # noqa: E402
+from ovos_bus_client.message import Message  # noqa: E402
 
 from ovos_adapt.opm import AdaptPipeline  # noqa: E402
 
@@ -35,11 +34,38 @@ class _AdaptHarness(E2EPipelineHarness):
 
     pipeline: AdaptPipeline  # type: ignore[assignment]
 
+    def setUp(self) -> None:
+        # ovoscope.E2EPipelineHarness.setUp() emits its per-test isolation
+        # "detach_skill" with no message.context["skill_id"], which
+        # OVOS-INTENT-4 §3.2 requires as the authoritative attribution;
+        # redo it here with the context set so isolation between tests in
+        # this TestCase still works.
+        self._detach_skill(self.SKILL_ID)
+
     def _vocab(self, name, words):
-        register_adapt_vocab(self.bus, f"{self.SKILL_ID}:{name}", words)
+        self._register_vocab(f"{self.SKILL_ID}:{name}", words, self.SKILL_ID)
 
     def _intent(self, builder):
         register_adapt_intent(self.bus, builder)
+
+    def _detach_skill(self, skill_id):
+        # ovoscope.detach_skill() does not set message.context["skill_id"]
+        # (OVOS-INTENT-4 §3.2), so it is bypassed here in favour of a
+        # direct emit that does. Temporary until ovoscope#185 releases a
+        # fixed harness.
+        self.bus.emit(Message("detach_skill", {"skill_id": skill_id},
+                              {"skill_id": skill_id}))
+
+    def _register_vocab(self, entity_type, words, skill_id):
+        # ovoscope.register_adapt_vocab() does not set
+        # message.context["skill_id"] (OVOS-INTENT-4 §3.2), so it is
+        # bypassed here in favour of a direct emit that does. Temporary
+        # until ovoscope#185 releases a fixed harness.
+        for word in words:
+            self.bus.emit(Message("register_vocab", {
+                "entity_value": word, "entity_type": entity_type,
+                "lang": "en-US",
+            }, {"skill_id": skill_id}))
 
 
 class TestRegisteredIntentMatch(_AdaptHarness):
@@ -168,8 +194,8 @@ class TestDetach(_AdaptHarness):
             .require(f"{self.SKILL_ID}:TurnOn")
             .require(f"{self.SKILL_ID}:Light")
         )
-        register_adapt_vocab(self.bus, "skill_b_adapt:Play", ["play"])
-        register_adapt_vocab(self.bus, "skill_b_adapt:Music", ["music"])
+        self._register_vocab("skill_b_adapt:Play", ["play"], "skill_b_adapt")
+        self._register_vocab("skill_b_adapt:Music", ["music"], "skill_b_adapt")
         register_adapt_intent(
             self.bus,
             IntentBuilder("skill_b_adapt:play_music")
@@ -177,13 +203,13 @@ class TestDetach(_AdaptHarness):
             .require("skill_b_adapt:Music"),
         )
 
-        detach_skill(self.bus, self.SKILL_ID)
+        self._detach_skill(self.SKILL_ID)
 
         self.expect_no_match("turn off the lights")
         self.expect_no_match("turn on the lights")
         msg = self.send_and_capture("play music", expected_types=["skill_b_adapt:play_music"])
         self.assertIsNotNone(msg, "skill_b intent should survive skill_a detach")
-        detach_skill(self.bus, "skill_b_adapt")
+        self._detach_skill("skill_b_adapt")
 
 
 class TestSessionBlacklist(_AdaptHarness):
