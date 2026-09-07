@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.3a3](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a3) (2026-09-07)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.3a2...1.6.3a3)
+
+**Merged pull requests:**
+
+- fix: registration handlers take skill\_id from the message context \(OVOS-INTENT-4 §3.2\) [\#70](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/70) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.6.3a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a2) (2026-09-01)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.3a1...1.6.3a2)
