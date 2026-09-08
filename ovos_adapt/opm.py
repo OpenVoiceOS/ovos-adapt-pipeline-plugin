@@ -722,6 +722,21 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             message (Message): message containing intent info
         """
         intent_name = message.data.get('intent_name')
+        # OVOS-INTENT-4 §3.2 — the legacy ``detach_intent`` topic munges the
+        # owning skill_id into ``intent_name`` (``<skill_id>:<name>``). The
+        # bus-client legacy twin of ``ovos.intent.deregister`` builds that
+        # name from the untrusted payload's skill_id while forwarding the
+        # original context unchanged, so a mismatched prefix means the
+        # request is asking to detach an intent it does not own.
+        context_skill_id = message.context.get("skill_id") if message.context else None
+        if context_skill_id and intent_name and ":" in intent_name:
+            owner = intent_name.split(":", 1)[0]
+            if owner != context_skill_id:
+                LOG.warning(f"[handle_detach_intent] rejected: intent_name="
+                            f"{intent_name!r} does not belong to "
+                            f"message.context['skill_id']={context_skill_id!r} "
+                            f"(topic={message.msg_type})")
+                return
         self.detach_intent(intent_name)
 
     def handle_detach_skill(self, message):

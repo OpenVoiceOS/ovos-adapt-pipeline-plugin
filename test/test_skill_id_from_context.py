@@ -178,6 +178,44 @@ class TestRegisterVocabTakesSkillIdFromContext(TestCase):
             "must not silently leak into an unrelated skill's intent")
 
 
+class TestDetachIntentTakesSkillIdFromContext(TestCase):
+    """OVOS-INTENT-4 §3.2: the legacy ``detach_intent`` topic munges the
+    owning skill_id into ``intent_name`` (``<skill_id>:<name>``). The
+    bus-client legacy twin of ``ovos.intent.deregister`` builds that name
+    from the payload's (attacker-controlled) skill_id while forwarding the
+    original context unchanged, so the handler must reject a mismatch
+    instead of detaching whatever the payload asked for."""
+
+    def setUp(self):
+        from ovos_utils.fakebus import FakeBus
+
+        self.bus = FakeBus()
+        self.pipeline = AdaptPipeline(self.bus)
+        from ovos_adapt.intent import IntentBuilder
+        self.pipeline.register_vocabulary("on", "OnKeyword", None, None,
+                                          "en-US", skill_id="victim.skill")
+        self.pipeline.register_intent(
+            IntentBuilder("victim.skill:on").require("OnKeyword").build())
+
+    def test_deregister_legacy_twin_with_forged_payload_skill_id_is_rejected(self):
+        msg = Message(SpecMessage.INTENT_DEREGISTER,
+                      {"skill_id": "victim.skill", "intent_name": "on"},
+                      {"skill_id": "attacker.skill"})
+        with mock.patch.object(LOG, "warning") as warn:
+            self.bus.emit(msg)
+        names = [p.name for p in self.pipeline.engines["en-US"].intent_parsers]
+        self.assertIn("victim.skill:on", names)
+        self.assertTrue(any("does not belong to" in w for w in _warnings(warn)))
+
+    def test_deregister_legacy_twin_with_matching_context_still_detaches(self):
+        msg = Message(SpecMessage.INTENT_DEREGISTER,
+                      {"skill_id": "victim.skill", "intent_name": "on"},
+                      {"skill_id": "victim.skill"})
+        self.bus.emit(msg)
+        names = [p.name for p in self.pipeline.engines["en-US"].intent_parsers]
+        self.assertNotIn("victim.skill:on", names)
+
+
 class TestEnableDisableAreExemptFromContextIdentity(TestCase):
     """OVOS-INTENT-4 §3.2 exempts ``ovos.intent.enable``/``ovos.intent.disable``
     from the identity check: they are control messages, not ownership
