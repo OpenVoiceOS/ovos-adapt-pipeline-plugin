@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.3a4](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a4) (2026-09-09)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.3a3...1.6.3a4)
+
+**Merged pull requests:**
+
+- test: pass skill\_id to the ovoscope harness helpers [\#72](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/72) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.6.3a3](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a3) (2026-09-07)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.3a2...1.6.3a3)
