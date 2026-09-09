@@ -171,6 +171,7 @@ class TestLegacyStillConsumed(_Intent4AdaptHarness):
             IntentBuilder(f"{self.SKILL_ID}:lights_off")
             .require(f"{self.SKILL_ID}:TurnOff")
             .require(f"{self.SKILL_ID}:Light"),
+            skill_id=self.SKILL_ID,
         )
         msg = self.send_and_capture(
             "turn off the lights",
