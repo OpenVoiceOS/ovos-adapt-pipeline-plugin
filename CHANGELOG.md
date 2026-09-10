@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.4a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.4a1) (2026-09-10)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.3a4...1.6.4a1)
+
+**Merged pull requests:**
+
+- fix: spec handlers act on the payload skill\_id, not the sender [\#76](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/76) ([JarbasAl](https://github.com/JarbasAl))
+
 ## [1.6.3a4](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.3a4) (2026-09-09)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.3a3...1.6.3a4)
