@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ovos_adapt_parser"
+dynamic = ["version"]
+description = "A text-to-intent parsing framework."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE.md"]
+authors = [{ name = "Sean Fitzgerald" }]
+keywords = ["natural language processing", "intent", "nlp", "ovos"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Text Processing :: Linguistic",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "six>=1.10.0",
+    "ovos-plugin-manager>=2.4.0a1,<3.0.0",
+    "ovos-utils>=0.3.4,<1.0.0",
+    "ovos_bus_client>=2.5.1a1,<3.0.0",
+    "ovos-spec-tools>=1.4.0a1",
+    "langcodes",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+    # INTENT-4 consumer e2e stack floor (ovos.intent.register.* topics +
+    # E2EPipelineHarness namespace flags). Mirrors ovos-test-harness@dev.
+    "ovos-bus-client>=2.5.1a1",
+    "ovos-spec-tools>=1.4.0a1",
+    # ovos-workshop 9.0.1a2 regressed IntentBuilder.build(): it now returns an
+    # ovos_spec_tools.intent.Intent that lacks .validate / .validate_with_tags,
+    # which ovos_adapt.engine.register_intent_parser requires — breaking BOTH
+    # the legacy and the INTENT-4 spec registration paths. Pin the last good
+    # prerelease (9.0.0a1, which still satisfies bus-client>=2.4.0a1) until the
+    # upstream regression is fixed. See report / ovos-workshop.
+    "ovos-workshop==9.0.0a1",
+]
+
+[project.urls]
+Homepage = "https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin"
+
+[project.entry-points."opm.pipeline"]
+"ovos-adapt-pipeline-plugin" = "ovos_adapt.opm:AdaptPipeline"
+"ovos-adapt-domain-pipeline-plugin" = "ovos_adapt.opm:DomainAdaptPipeline"
+"ovos-adapt-hierarchical-pipeline-plugin" = "ovos_adapt.opm:HierarchicalAdaptPipeline"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ovos_adapt*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ovos_adapt.version.__version__" }
