@@ -1247,12 +1247,13 @@ class DomainAdaptPipeline(AdaptPipeline):
                             skill_id: Optional[str] = None):
         """Register skill vocabulary, routed to a domain.
 
-        When ``skill_id`` is provided and maps to a known domain (recorded
-        in ``_entity_domain_index`` during ``register_intent``), it is
-        routed there directly. This is unambiguous, unlike the entity_type
-        prefix guess used as a fallback. ``_resolve_entity_domain`` is only
-        used when ``skill_id`` is absent or doesn't map to a known domain
-        (e.g. vocab registered before any intent from that skill).
+        When ``skill_id`` is provided the vocab goes to that skill's
+        domain: the domain is the skill_id (``_domain_from_intent_name``),
+        and the engine creates it on first use. This holds when the vocab
+        arrives before the skill's first intent, which is the order
+        ``handle_spec_register_keyword`` uses. ``_resolve_entity_domain``,
+        the entity_type prefix guess, is only used when ``skill_id`` is
+        absent.
         """
         lang = self._get_closest_lang(lang)
         if lang is not None:
@@ -1263,11 +1264,12 @@ class DomainAdaptPipeline(AdaptPipeline):
                 group = re.search(r"\(\?P<([^>]+)>", regex_str)
                 entity_type = group.group(1) if group else None
             with self.lock:
-                domain = None
                 if skill_id:
-                    norm = _entity_skill_id(skill_id)
-                    domain = self._entity_domain_index.get(lang, {}).get(norm)
-                if domain is None:
+                    domain = skill_id
+                    # record the prefix so a later vocab without skill_id
+                    # for the same entity family routes here too
+                    self._entity_domain_index[lang][_entity_skill_id(skill_id)] = domain
+                else:
                     domain = self._resolve_entity_domain(lang, entity_type)
                 if regex_str:
                     self.engines[lang].register_regex_entity(
