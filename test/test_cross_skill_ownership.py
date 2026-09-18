@@ -130,11 +130,22 @@ class TestDomainVocabRoutingBySkillId(TestCase):
         self.assertFalse(self._in_domain('cal.skill', 'hello'),
                          "vocab wrongly landed in the prefix-guessed domain")
 
-    def test_unmapped_skill_id_falls_back_to_prefix_guess(self):
-        # skill_id that maps to no known domain -> falls back to
-        # _resolve_entity_domain's prefix guess, same as before the fix.
+    def test_unmapped_skill_id_gets_its_own_domain(self):
+        # a skill_id with no intent yet still owns its vocab: the domain
+        # is created for it, and the prefix guess does not send the vocab
+        # to another skill. This is the order handle_spec_register_keyword
+        # uses (vocab first, then the intent).
         self.pipeline.register_vocabulary(
             entity_value='world', entity_type='cal_skillOther',
             alias_of=None, regex_str=None, lang=self.lang,
             skill_id='unregistered.skill')
+        self.assertTrue(self._in_domain('unregistered.skill', 'world'))
+        self.assertFalse(self._in_domain('cal.skill', 'world'),
+                         "vocab wrongly landed in the prefix-guessed domain")
+
+    def test_no_skill_id_falls_back_to_prefix_guess(self):
+        # an emitter that sends no skill_id keeps the prefix guess
+        self.pipeline.register_vocabulary(
+            entity_value='world', entity_type='cal_skillOther',
+            alias_of=None, regex_str=None, lang=self.lang)
         self.assertTrue(self._in_domain('cal.skill', 'world'))
