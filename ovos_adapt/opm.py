@@ -15,7 +15,7 @@
 """An intent parsing service using the Adapt parser."""
 import re
 import time
-from functools import lru_cache
+from functools import lru_cache, wraps
 from threading import Lock
 from typing import List, Optional, Iterable, Union, Dict
 
@@ -137,6 +137,26 @@ class _InjectedContextManager:
         return [dict(entity) for entity in self._entities]
 
 
+def _invalidates_match_cache(method):
+    """Clear the ``match_intent`` cache after a method changes the engines.
+
+    The cache lets the high, medium and low tiers share one engine run per
+    round. It is keyed on the utterances, the lang and the serialized
+    message, not on the registrations, so any change to the engines makes
+    every entry stale. A detached skill kept matching a repeated
+    ``intent.service.intent.get`` probe on a live core until this cleared
+    it. The clear runs after the change, so a match that runs during the
+    change cannot cache the old state past it.
+    """
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self._invalidate_match_cache()
+    return wrapper
+
+
 class AdaptPipeline(ConfidenceMatcherPipeline):
     """Intent service wrapping the Adapt intent Parser."""
 
@@ -207,6 +227,11 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         sess = SessionManager.get()
         ents = [tag['entities'][0] for tag in intent['__tags__'] if 'entities' in tag]
         sess.context.update_context(ents)
+
+    def _invalidate_match_cache(self):
+        """Drop every cached ``match_intent`` result (see
+        ``_invalidates_match_cache``)."""
+        self.match_intent.cache_clear()
 
     def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """Intent matcher for high confidence.
@@ -497,6 +522,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                       if m["skill_id"] == skill_id]:
             self._intent_keywords.pop(label, None)
 
+    @_invalidates_match_cache
     def register_vocabulary(self, entity_value: str, entity_type: str,
                             alias_of: str, regex_str: str, lang: str,
                             skill_id: Optional[str] = None):
@@ -540,6 +566,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
                         self._entity_owners.setdefault(skill_id, set()).add(
                             entity_type)
 
+    @_invalidates_match_cache
     def register_intent(self, intent):
         """Register new intent with adapt engine.
 
@@ -552,6 +579,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         # OVOS-CONTEXT-1 §7 — index declared keywords for candidate injection.
         self._record_intent_keywords(intent)
 
+    @_invalidates_match_cache
     def detach_skill(self, skill_id):
         """Remove all intents for skill.
 
@@ -642,6 +670,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
         for lang in self.engines:
             self.engines[lang].drop_regex_entity(match_func=match_func)
 
+    @_invalidates_match_cache
     def detach_intent(self, intent_name):
         """Detatch a single intent
 
@@ -655,10 +684,12 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             self.engines[lang].intent_parsers = new_parsers
         self._intent_keywords.pop(intent_name, None)
 
+    @_invalidates_match_cache
     def shutdown(self):
         for lang in self.engines:
-            parsers = self.engines[lang].intent_parsers
-            self.engines[lang].drop_intent_parser(parsers)
+            # drop_intent_parser takes names, not parser objects
+            names = [p.name for p in self.engines[lang].intent_parsers]
+            self.engines[lang].drop_intent_parser(names)
 
     @property
     def registered_intents(self):
@@ -958,6 +989,7 @@ class AdaptPipeline(ConfidenceMatcherPipeline):
             return
         self.detach_intent(self._spec_intent_name(skill_id, intent_name))
 
+    @_invalidates_match_cache
     def handle_spec_deregister_entity(self, message):
         """Consume ``ovos.entity.deregister`` (INTENT-4 §8.3)."""
         data = message.data
@@ -1195,6 +1227,7 @@ class DomainAdaptPipeline(AdaptPipeline):
             )
         return None
 
+    @_invalidates_match_cache
     def register_intent(self, intent):
         """Register a new intent with the per-domain engine."""
         domain = _domain_from_intent_name(intent.name)
@@ -1208,6 +1241,7 @@ class DomainAdaptPipeline(AdaptPipeline):
         # OVOS-CONTEXT-1 §7 — index declared keywords for candidate injection.
         self._record_intent_keywords(intent)
 
+    @_invalidates_match_cache
     def register_vocabulary(self, entity_value: str, entity_type: str,
                             alias_of: str, regex_str: str, lang: str,
                             skill_id: Optional[str] = None):
@@ -1243,6 +1277,7 @@ class DomainAdaptPipeline(AdaptPipeline):
                         entity_value, entity_type, alias_of=alias_of,
                         domain=domain)
 
+    @_invalidates_match_cache
     def detach_skill(self, skill_id):
         """Drop the whole domain for a skill."""
         with self.lock:
@@ -1255,6 +1290,7 @@ class DomainAdaptPipeline(AdaptPipeline):
                     idx.pop(prefix, None)
         self._forget_intent_keywords(skill_id)
 
+    @_invalidates_match_cache
     def detach_intent(self, intent_name):
         """Detach a single intent from its owning domain."""
         domain = _domain_from_intent_name(intent_name)
@@ -1267,6 +1303,7 @@ class DomainAdaptPipeline(AdaptPipeline):
                                           if p.name != intent_name]
         self._intent_keywords.pop(intent_name, None)
 
+    @_invalidates_match_cache
     def shutdown(self):
         with self.lock:
             for lang in self.engines:
