@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.5a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.5a1) (2026-09-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.4a1...1.6.5a1)
+
+**Merged pull requests:**
+
+- fix: clear the match cache when a registration changes [\#80](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/80) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [1.6.4a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.4a1) (2026-09-10)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.3a4...1.6.4a1)
