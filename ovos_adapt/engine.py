@@ -13,14 +13,51 @@
 # limitations under the License.
 #
 
+import itertools
 import re
 import heapq
+from typing import List
+
 from ovos_adapt.entity_tagger import EntityTagger
 from ovos_adapt.parser import Parser
 from ovos_adapt.tools.text.tokenizer import EnglishTokenizer
 from ovos_adapt.tools.text.trie import Trie
+from ovos_adapt.intent import Intent
 
 __author__ = 'seanfitz'
+
+
+def expand_template(template: str) -> List[str]:
+    """Expand OVOS template syntax into all concrete surface forms.
+
+    ``(a|b)`` alternatives and ``[opt]`` optionals are expanded into the
+    full list of sentences they describe.
+    """
+    def expand_optional(text):
+        return re.sub(r"\[([^\[\]]+)\]", lambda m: f"({m.group(1)}|)", text)
+
+    def expand_alternatives(text):
+        parts = []
+        for segment in re.split(r"(\([^\(\)]+\))", text):
+            if segment.startswith("(") and segment.endswith(")"):
+                parts.append(segment[1:-1].split("|"))
+            else:
+                parts.append([segment])
+        return itertools.product(*parts)
+
+    def fully_expand(texts):
+        result = set(texts)
+        while True:
+            expanded = set()
+            for text in result:
+                for option in expand_alternatives(text):
+                    expanded.add("".join(option).strip())
+            if expanded == result:
+                break
+            result = expanded
+        return sorted(result)
+
+    return fully_expand([expand_optional(template)])
 
 
 class IntentDeterminationEngine(object):
@@ -154,14 +191,25 @@ class IntentDeterminationEngine(object):
         """
         Register an entity to be tagged in potential parse results
 
+        OVOS template syntax is supported in entity_value: ``(a|b)``
+        alternatives and ``[opt]`` optionals are expanded into all concrete
+        surface forms, each registered as a separate trie entry.
+
         Args:
             entity_value(str): the value/proper name of an entity instance (Ex: "The Big Bang Theory")
             entity_type(str): the type/tag of an entity instance (Ex: "Television Show")
         """
-        if alias_of:
-            self.trie.insert(entity_value.lower(), data=(alias_of, entity_type))
+        if entity_value and any(c in entity_value for c in "(["):
+            variants = {" ".join(v.split()) for v in expand_template(entity_value)
+                        if v and v.strip()}
         else:
-            self.trie.insert(entity_value.lower(), data=(entity_value, entity_type))
+            variants = {entity_value}
+        for variant in variants:
+            if alias_of:
+                self.trie.insert(variant.lower(), data=(alias_of, entity_type))
+            else:
+                self.trie.insert(variant.lower(), data=(variant, entity_type))
+        if not alias_of:
             self.trie.insert(entity_type.lower(), data=(entity_type, 'Concept'))
 
     def register_regex_entity(self, regex_str):
@@ -186,6 +234,22 @@ class IntentDeterminationEngine(object):
         Raises:
             ValueError: on invalid intent
         """
+        # Intents built via the shared ovos-spec-tools primitive (e.g.
+        # ovos-workshop re-exporting IntentBuilder) carry the same fields but
+        # lack adapt's matching API (validate / validate_with_tags). Rebuild
+        # them as an adapt Intent so they can be matched. Skills registering
+        # over the bus already get this via open_intent_envelope; this covers
+        # direct in-process registration.
+        if not (hasattr(intent_parser, 'validate_with_tags') and
+                callable(getattr(intent_parser, 'validate_with_tags', None))):
+            if all(hasattr(intent_parser, attr) for attr in
+                   ('name', 'requires', 'at_least_one', 'optional', 'excludes')):
+                intent_parser = Intent(intent_parser.name,
+                                       intent_parser.requires,
+                                       intent_parser.at_least_one,
+                                       intent_parser.optional,
+                                       intent_parser.excludes)
+
         if hasattr(intent_parser, 'validate') and callable(intent_parser.validate):
             self.intent_parsers.append(intent_parser)
         else:
@@ -488,3 +552,80 @@ class DomainIntentDeterminationEngine(object):
         """
         return self.domains[domain].drop_regex_entity(entity_type=entity_type,
                                                       match_func=match_func)
+
+
+class HierarchicalIntentDeterminationEngine(DomainIntentDeterminationEngine):
+    """Two-stage domain engine: classify the domain, then resolve the intent.
+
+    Shares the registration API of :class:`DomainIntentDeterminationEngine`.
+    Where that engine scores every domain in parallel and takes the global
+    argmax, :meth:`determine_intent` here first picks a single domain with a
+    keyword-coverage classifier and evaluates only that domain's sub-engine.
+    A misclassified domain cannot be recovered.
+    """
+
+    def __init__(self):
+        super().__init__()
+        #: domain -> set of registered entity surface forms, scored by the
+        #: stage-1 classifier.
+        self._domain_vocabulary = {}
+
+    def register_entity(self, entity_value, entity_type, alias_of=None,
+                        domain=0):
+        """Register an entity and record its surface form for the classifier."""
+        super().register_entity(entity_value, entity_type,
+                                alias_of=alias_of, domain=domain)
+        self._domain_vocabulary.setdefault(domain, set()).add(
+            entity_value.lower())
+
+    def classify_domain(self, utterance):
+        """Return the domain whose vocabulary best covers the utterance.
+
+        Scores each domain by the number of utterance characters covered by
+        its registered entity values, word-boundary matched.
+
+        Args:
+            utterance(str): the utterance to classify.
+
+        Returns:
+            The best-matching domain, or ``None`` when no domain keyword is
+            present.
+        """
+        text = utterance.lower()
+        best_domain = None
+        best_score = 0
+        for domain, vocabulary in self._domain_vocabulary.items():
+            if domain not in self.domains:
+                continue
+            covered = bytearray(len(text))
+            for keyword in vocabulary:
+                for match in re.finditer(
+                        r"\b" + re.escape(keyword) + r"\b", text):
+                    for i in range(match.start(), match.end()):
+                        covered[i] = 1
+            score = sum(covered)
+            if score > best_score:
+                best_score = score
+                best_domain = domain
+        return best_domain
+
+    def determine_intent(self, utterance, num_results=1, include_tags=False,
+                         context_manager=None):
+        """Classify the domain, then yield intents from that domain only.
+
+        Args:
+            utterance(str): an ascii or unicode string representing natural
+                language speech.
+            num_results(int): a maximum number of results to be returned.
+            include_tags(bool): include the parsed tags as part of result.
+            context_manager(list): a context manager to provide context.
+
+        Returns: A generator that yields dictionaries.
+        """
+        domain = self.classify_domain(utterance)
+        if domain is None or domain not in self.domains:
+            return
+        for intent in self.domains[domain].determine_intent(
+                utterance=utterance, num_results=num_results,
+                include_tags=include_tags, context_manager=context_manager):
+            yield intent
