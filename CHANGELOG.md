@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.7a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.7a1) (2026-09-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.6a1...1.6.7a1)
+
+**Merged pull requests:**
+
+- fix: close README.md after the module docstring read [\#85](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/85) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [1.6.6a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.6a1) (2026-09-18)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.5a1...1.6.6a1)
