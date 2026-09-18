@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.6a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.6a1) (2026-09-18)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.5a1...1.6.6a1)
+
+**Merged pull requests:**
+
+- fix: route a vocab by its skill\_id even before the skill's first intent [\#81](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/81) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [1.6.5a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.5a1) (2026-09-18)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.4a1...1.6.5a1)
