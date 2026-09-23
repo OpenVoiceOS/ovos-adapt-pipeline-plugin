@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.7a2](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.7a2) (2026-09-23)
+
+[Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.7a1...1.6.7a2)
+
+**Merged pull requests:**
+
+- chore: floor ovos-workshop in the test extra instead of an exact pin [\#83](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/pull/83) ([openvoiceos-bot](https://github.com/openvoiceos-bot))
+
 ## [1.6.7a1](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/tree/1.6.7a1) (2026-09-18)
 
 [Full Changelog](https://github.com/OpenVoiceOS/ovos-adapt-pipeline-plugin/compare/1.6.6a1...1.6.7a1)
