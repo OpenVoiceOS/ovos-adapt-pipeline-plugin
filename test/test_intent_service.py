@@ -15,7 +15,7 @@
 from unittest import TestCase, mock
 
 from ovos_bus_client.message import Message
-from ovos_workshop.intents import IntentBuilder, Intent as AdaptIntent
+from ovos_adapt.intent import IntentBuilder, Intent as AdaptIntent
 
 from ovos_adapt.opm import AdaptPipeline
 
@@ -23,7 +23,8 @@ from ovos_adapt.opm import AdaptPipeline
 def create_vocab_msg(keyword, value):
     """Create a message for registering an adapt keyword."""
     return Message('register_vocab',
-                   {'entity_value': value, 'entity_type': keyword})
+                   {'entity_value': value, 'entity_type': keyword},
+                   {'skill_id': 'skill'})
 
 
 def get_last_message(bus):
@@ -97,12 +98,45 @@ class TestPipeline(TestCase):
         """Check that a removed skill's intent doesn't match."""
         # Check that no intent is matched
         msg = Message('detach_intent',
-                      data={'skill_id': 'skill'})
+                      data={'skill_id': 'skill'},
+                      context={'skill_id': 'skill'})
         self.adapt_pipeline.handle_detach_skill(msg)
         msg = Message('intent.service.adapt.get', data={'utterance': 'test'})
         self.adapt_pipeline.handle_get_adapt(msg)
         reply = get_last_message(self.adapt_pipeline.bus)
         self.assertEqual(reply.data['intent'], None)
+
+
+class TestBracketExpansion(TestCase):
+    """Verify that OVOS template syntax in vocab entries is expanded
+    into concrete surface forms by the adapt engine's register_entity."""
+
+    def setUp(self):
+        self.adapt_pipeline = AdaptPipeline(mock.Mock())
+        # Register a single templated vocab entry covering (a|b) and [opt]
+        msg = create_vocab_msg('lightAction',
+                               'turn (on|off) the [bright] lights')
+        self.adapt_pipeline.handle_register_vocab(msg)
+
+        intent = IntentBuilder('skill:lightsIntent').require('lightAction')
+        msg = Message('register_intent', intent.__dict__)
+        self.adapt_pipeline.handle_register_intent(msg)
+
+    def _match(self, utterance):
+        msg = Message('intent.service.adapt.get',
+                      data={'utterance': utterance})
+        self.adapt_pipeline.handle_get_adapt(msg)
+        return get_last_message(self.adapt_pipeline.bus).data['intent']
+
+    def test_alternative_and_optional_present(self):
+        intent = self._match('turn off the bright lights')
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent['intent_type'], 'skill:lightsIntent')
+
+    def test_alternative_and_optional_absent(self):
+        intent = self._match('turn on the lights')
+        self.assertIsNotNone(intent)
+        self.assertEqual(intent['intent_type'], 'skill:lightsIntent')
 
 
 class TestAdaptIntent(TestCase):
