@@ -1,93 +1,105 @@
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.md) 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.md)
 
-Adapt Intent Parser
-==================
-The Adapt Intent Parser is a flexible and extensible intent definition and determination framework. It is intended to parse natural language text into a structured intent that can then be invoked programatically.
+# Adapt Intent Parser
 
-This repository contains a OVOS pipeline plugin and bundles a fork of the original [adapt-parser](https://github.com/MycroftAI/adapt) from the defunct MycroftAI
+Adapt is a keyword and rule based intent parser. It reads an utterance and
+matches it to a registered intent, then extracts the entity values the intent
+needs. This repository provides an OVOS pipeline plugin and bundles a
+maintained fork of the original [MycroftAI/adapt](https://github.com/MycroftAI/adapt)
+parser, from the now-defunct MycroftAI.
 
-Examples
-========
-Executable examples can be found in the [examples folder](https://github.com/MycroftAI/adapt/tree/master/examples).
+Three OPM pipeline entry points are exposed:
 
-Intent Modelling
-================
-In this context, an Intent is an action the system should perform. In the context of Pandora, we’ll define two actions: List Stations, and Select Station (aka start playback)
+- `ovos-adapt-pipeline-plugin` (`AdaptPipeline`), the flat pipeline. It wraps
+  a single `IntentDeterminationEngine` and all skills share one trie.
+- `ovos-adapt-domain-pipeline-plugin` (`DomainAdaptPipeline`), a per-skill
+  pipeline. It wraps `DomainIntentDeterminationEngine`. Each `skill_id` gets
+  its own sub-engine ("domain"). At match time every domain is scored in
+  parallel and the global argmax wins. Configure it under
+  `intents.ovos_adapt_domain_pipeline`.
+- `ovos-adapt-hierarchical-pipeline-plugin` (`HierarchicalAdaptPipeline`), the
+  same per-skill domain model, with two-stage routing. A stage-1 classifier
+  picks one domain, then only that domain's sub-engine is scored. Configure it
+  under `intents.ovos_adapt_hierarchical_pipeline`.
 
-With the Adapt intent builder:
-```Python
-list_stations_intent = IntentBuilder('pandora:list_stations')\
-    .require('Browse Music Command')\
+See [Pipeline variants](docs/pipelines.md) for when to use each.
+
+## Install
+
+```bash
+pip install ovos-adapt-parser
+```
+
+## Usage
+
+The adapt parser also works standalone, with no OVOS and no messagebus:
+
+```python
+from ovos_adapt.intent import IntentBuilder
+from ovos_adapt.engine import IntentDeterminationEngine
+
+engine = IntentDeterminationEngine()
+
+# register vocabulary: surface forms grouped by entity type
+for word in ["weather", "forecast"]:
+    engine.register_entity(word, "WeatherKeyword")
+for city in ["Seattle", "San Francisco", "Tokyo"]:
+    engine.register_entity(city, "Location")
+
+# build an intent over those entity types
+weather = IntentBuilder("WeatherIntent") \
+    .require("WeatherKeyword") \
+    .require("Location") \
     .build()
+engine.register_intent_parser(weather)
+
+# match
+for intent in engine.determine_intent("what is the forecast in Tokyo"):
+    if intent.get("confidence", 0) > 0:
+        print(intent)
 ```
 
-For the above, we are describing a “List Stations” intent, which has a single requirement of a “Browse Music Command” entity.
+In a full OVOS install the plugin runs as a pipeline stage instead. Skills
+register vocabulary and intents over the messagebus, and the plugin matches
+incoming utterances automatically. More runnable examples ship in the
+[`examples/`](examples) folder.
 
-```Python
-play_music_command = IntentBuilder('pandora:select_station')\
-    .require('Listen Command')\
-    .require('Pandora Station')\
-    .optionally('Music Keyword')\
-    .build()
-```
+## Documentation
 
+A full guide, from first concepts to internals, lives in [`docs/`](docs/index.md):
 
-For the above, we are describing a “Select Station” (aka start playback) intent, which requires a “Listen Command” entity, a “Pandora Station”, and optionally a “Music Keyword” entity.
+- [Concepts](docs/concepts.md), entities, intents, cliques, and confidence
+- [Quickstart](docs/quickstart.md), install, enable, match your first utterance
+- [Writing intents](docs/writing-intents.md), the `IntentBuilder` API with examples
+- [Configuration](docs/configuration.md), confidence tiers and every config key
+- [Pipeline variants](docs/pipelines.md), the flat, domain, and hierarchical plugins
+- [Bus protocol](docs/bus-protocol.md), the messagebus API skills register over
+- [Internals](docs/internals.md), tagging, clique expansion, and the confidence math
+- [Engine comparison reference](docs/benchmark.md), how the variants diverge
 
-Entities
-========
+## Related projects
 
-Entities are a named value. Examples include:
-`Blink 182` is an `Artist`
-`The Big Bang Theory` is a `Television Show`
-`Play` is a `Listen Command`
-`Song(s)` is a `Music Keyword`
+- [OpenVoiceOS/ovos-plugin-manager](https://github.com/OpenVoiceOS/ovos-plugin-manager), discovers and loads this plugin by its OPM entry point.
+- [OpenVoiceOS/ovos-padatious-pipeline-plugin](https://github.com/OpenVoiceOS/ovos-padatious-pipeline-plugin), a model-based intent matcher that runs alongside Adapt in the same pipeline.
+- [OpenVoiceOS/ovos-workshop](https://github.com/OpenVoiceOS/ovos-workshop), the skill framework that registers vocabulary and intents with this plugin.
+- [MycroftAI/adapt](https://github.com/MycroftAI/adapt), the original parser this plugin's engine is forked from.
 
-For my Pandora implementation, there is a static set of vocabulary for the Browse Music Command, Listen Command, and Music Keyword (defined by me, a native english speaker and all-around good guy). Pandora Station entities are populated via a "List Stations" API call to Pandora. Here’s what the vocabulary registration looks like.
+## Reporting issues
 
-```Python
-def register_vocab(entity_type, entity_value):
-    pass
-    # a tiny bit of code 
-
-def register_pandora_vocab(emitter):
-    for v in ["stations"]:
-        register_vocab('Browse Music Command', v)
-
-    for v in ["play", "listen", "hear"]:
-        register_vocab('Listen Command', v)
-
-    for v in ["music", "radio"]:
-        register_vocab('Music Keyword', v)
-
-    for v in ["Pandora"]:
-        register_vocab('Plugin Name', v)
-
-    station_name_regex = re.compile(r"(.*) Radio")
-    p = get_pandora()
-    for station in p.stations:
-        m = station_name_regex.match(station.get('stationName'))
-        if not m:
-            continue
-        for match in m.groups():
-            register_vocab('Pandora Station', match)
-```
-
-
-Reporting Issues
-================
-It's often difficult to debug issues with adapt without a complete context. To facilitate simpler debugging,
-please include a serialized copy of the intent determination engine using the debug dump
-utilities.
+Adapt is difficult to debug without full context. Include a serialized copy of
+the intent determination engine, using the debug dump utilities:
 
 ```python
 from ovos_adapt.engine import IntentDeterminationEngine
 
 engine = IntentDeterminationEngine()
-# Load engine with vocabulary and parsers
+# load engine with vocabulary and parsers
 
 import ovos_adapt.tools.debug as atd
 
 atd.dump(engine, 'debug.ovos_adapt')
 ```
 
+## License
+
+Apache License 2.0. See [LICENSE.md](LICENSE.md).
