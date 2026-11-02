@@ -71,9 +71,12 @@ class EntityTagger(object):
                 local_trie = Trie()
                 for regex_entity in self.regex_entities:
                     match = regex_entity.match(part)
-                    groups = match.groupdict() if match else {}
-                    for key in list(groups):
-                        match_str = groups.get(key)
+                    # a named group that took no part in the match (an
+                    # optional or alternative one: groupdict() gives None)
+                    # tagged nothing, so it is not an entity
+                    groups = {key: value for key, value in match.groupdict().items()
+                              if value is not None} if match else {}
+                    for key, match_str in groups.items():
                         local_trie.insert(match_str, (match_str, key))
                 sub_tagger = EntityTagger(local_trie, self.tokenizer, max_tokens=self.max_tokens)
                 for sub_entity in sub_tagger.tag(part):
